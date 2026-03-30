@@ -803,7 +803,7 @@
             liveRrBuffer.push({ t: p.t, m: p.m });
             const newestT = liveRrBuffer[liveRrBuffer.length - 1].t;
             
-            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 20000);
+            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
             const bufferDurationMs = newestT - liveRrBuffer[0].t;
 
             if (bufferDurationMs >= 5000) {
@@ -841,7 +841,7 @@
                     let baselineVals = [];
                     for(let i=0; i<sm.length; i++) {
                         let s=0, c=0;
-                        for(let j=Math.max(0, i-2); j<=Math.min(sm.length-1, i+2); j++) {
+                        for(let j=Math.max(0, i-5); j<=Math.min(sm.length-1, i+5); j++) {
                             s += sm[j].m; 
                             c++;
                         }
@@ -878,16 +878,15 @@
                         }
                         
                         if (peakTimes.length >= 2) {
-                            let totalInterval = 0;
-                            for (let k = 1; k < peakTimes.length; k++) {
-                                totalInterval += (peakTimes[k] - peakTimes[k-1]);
+                            let lastPeak = peakTimes[peakTimes.length - 1];
+                            let prevPeak = peakTimes[peakTimes.length - 2];
+                            let interval = lastPeak - prevPeak;
+                            if (interval > 0) {
+                                let liveRR = Math.round(60000 / interval);
+                                document.getElementById('rt-rr').innerText = liveRR;
                             }
-                            let avgInterval = totalInterval / (peakTimes.length - 1);
-                            let liveRR = Math.round(60000 / avgInterval);
-                            document.getElementById('rt-rr').innerText = liveRR;
                         } else {
-                            let liveRR = Math.round(peakTimes.length * (60000 / bufferDurationMs));
-                            document.getElementById('rt-rr').innerText = liveRR;
+                            document.getElementById('rt-rr').innerText = "--";
                         }
                     }
                     
@@ -1022,7 +1021,7 @@
                 let baselineVals = [];
                 for(let i = 0; i < smoothedVals.length; i++) {
                     let sum = 0, count = 0;
-                    for(let j = Math.max(0, i - 2); j <= Math.min(smoothedVals.length - 1, i + 2); j++) {
+                    for(let j = Math.max(0, i - 5); j <= Math.min(smoothedVals.length - 1, i + 5); j++) {
                         sum += smoothedVals[j];
                         count++;
                     }
