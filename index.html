@@ -840,7 +840,8 @@
                     let baselineVals = [];
                     for(let i=0; i<sm.length; i++) {
                         let s=0, c=0;
-                        for(let j=Math.max(0, i-5); j<=Math.min(sm.length-1, i+5); j++) {
+                        // 🌟 หน้าต่างเวลา 21 วินาที
+                        for(let j=Math.max(0, i-10); j<=Math.min(sm.length-1, i+10); j++) {
                             s += sm[j].m; 
                             c++;
                         }
@@ -856,7 +857,7 @@
                     } else {
                         let peakTimes = []; 
                         let minDistance = 2; 
-                        let minProminence = 40; // 🌟 เพิ่มความชัดเจนของยอดคลื่น
+                        let minProminence = 15; // 🌟 ปรับลดระดับความสูงที่ถือเป็นยอดคลื่น
                         let lastPeakIndex = -minDistance;
 
                         for (let i = 1; i < sm.length - 1; i++) {
@@ -866,7 +867,7 @@
                             let baseline = baselineVals[i];
 
                             let isPeak = (curr > prev) && (curr >= next);
-                            let isAboveBaseline = (curr - baseline) > minProminence;
+                            let isAboveBaseline = (curr - baseline) >= minProminence;
 
                             if (isPeak && isAboveBaseline) {
                                 if ((i - lastPeakIndex) >= minDistance) {
@@ -1014,7 +1015,8 @@
                 let baselineVals = [];
                 for(let i = 0; i < smoothedVals.length; i++) {
                     let sum = 0, count = 0;
-                    for(let j = Math.max(0, i - 5); j <= Math.min(smoothedVals.length - 1, i + 5); j++) {
+                    // 🌟 หน้าต่างเวลาคำนวณเส้นฐานให้กว้างขึ้นเป็น 31 วินาที เพื่อไม่ให้เส้นมันวิ่งตามคลื่น
+                    for(let j = Math.max(0, i - 15); j <= Math.min(smoothedVals.length - 1, i + 15); j++) {
                         sum += smoothedVals[j];
                         count++;
                     }
@@ -1023,7 +1025,7 @@
 
                 let breaths = 0;
                 let minDistance = 2; 
-                let minProminence = 40; // 🌟 เพิ่มความสูงคลื่นขั้นต่ำ ตัด Noise ออก
+                let minProminence = 15; // 🌟 ปรับลดระดับให้จับยอดคลื่นได้แม้คลื่นไม่สูงมาก
                 let lastPeakIndex = -minDistance;
 
                 for (let i = 1; i < smoothedVals.length - 1; i++) {
@@ -1033,7 +1035,7 @@
                     let baseline = baselineVals[i];
 
                     let isPeak = (curr > prev) && (curr >= next);
-                    let isAboveBaseline = (curr - baseline) > minProminence;
+                    let isAboveBaseline = (curr - baseline) >= minProminence;
 
                     if (isPeak && isAboveBaseline) {
                         if ((i - lastPeakIndex) >= minDistance) {
@@ -1043,7 +1045,6 @@
                     }
                 }
                 
-                // 🌟 บังคับใช้ตัวหารนาที จากช่วงเวลาที่คุณกดเลือกเป๊ะๆ (เพื่อไม่ให้ค่าเฉลี่ยโดด)
                 let diffMinutes = (t2 - t1) / 60000; 
                 if (diffMinutes <= 0) diffMinutes = 1; 
 
@@ -1068,7 +1069,7 @@
                 
                 let calculatedWidth = aggregatedData.length * 40; 
                 
-                // 🌟 จำกัดความกว้าง Canvas ป้องกันเบราว์เซอร์รับไม่ไหวแล้วรูปแตก
+                // 🌟 ป้องกันกราฟแตกหายไปเมื่อข้อมูลยาวเกิน
                 if (calculatedWidth > 32000) calculatedWidth = 32000;
 
                 if (calculatedWidth > scrollContainer.clientWidth - 40) {
