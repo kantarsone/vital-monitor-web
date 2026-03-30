@@ -723,24 +723,27 @@
         }
 
         if(tab === 'his') {
-            const now = new Date();
-            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            // 🌟 1. ล้างค่าเวลาให้เป็นช่องว่าง (--/--/---- --:--) บังคับให้ผู้ใช้เลือกเวลาเอง
+            document.getElementById('st').value = "";
+            document.getElementById('et').value = "";
             
-            const formatDT = (d) => {
-                const pad = (n) => (n < 10 ? '0' + n : n);
-                return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-            };
-            
-            document.getElementById('st').value = formatDT(startOfDay);
-            document.getElementById('et').value = formatDT(now);
-            
+            // 🌟 2. เซ็ตค่าตัวเลขทั้งหมดให้แสดงเป็น -- ไว้ก่อน
             document.getElementById('his-total-breaths').innerText = "--";
             document.getElementById('his-rr').innerText = "--";
             document.getElementById('his-bpm').innerText = "--";
             document.getElementById('his-spo2').innerText = "--";
             
-            document.getElementById('history-data-section').classList.add('hidden');
+            // 🌟 3. โชว์โครงหน้าต่างกราฟรอไว้ และซ่อนกล่อง "ยังไม่มีประวัติ"
+            document.getElementById('history-data-section').classList.remove('hidden');
             document.getElementById('no-history-msg').classList.add('hidden');
+            document.getElementById('pdf-btn').classList.add('hidden'); // ซ่อนปุ่ม PDF ไปก่อน
+            
+            // 🌟 4. ล้างข้อมูลกราฟให้เป็นกราฟเปล่าสะอาด
+            if (historyChart) {
+                historyChart.data.labels = [];
+                historyChart.data.datasets[0].data = [];
+                historyChart.update('none');
+            }
         }
     }
 
@@ -927,7 +930,7 @@
 
     async function queryHistory() {
         const s = document.getElementById('st').value, e = document.getElementById('et').value;
-        if(!s || !e) return alert("ระบุเวลาให้ครบ");
+        if(!s || !e) return alert("กรุณาระบุเวลาให้ครบถ้วน");
         
         const t1 = new Date(s).getTime(), t2 = new Date(e).getTime();
         if (t1 >= t2) return alert("เวลาเริ่มต้นต้องน้อยกว่าเวลาสิ้นสุด");
@@ -963,6 +966,7 @@
             const data = allData;
             
             if(data && data.length > 0) {
+                // 🌟 กรณีมีข้อมูล ให้โชว์กล่องกราฟและซ่อนกล่องข้อความ
                 document.getElementById('history-data-section').classList.remove('hidden');
                 document.getElementById('no-history-msg').classList.add('hidden');
                 
@@ -1107,12 +1111,14 @@
                 historyChart.update();
 
             } else { 
+                // 🌟 กรณี "ไม่มีข้อมูลย้อนหลังเลย" ให้ซ่อนหน้าต่างกราฟ และโชว์กล่องไอคอนแทน
                 document.getElementById('history-data-section').classList.add('hidden');
                 document.getElementById('no-history-msg').classList.remove('hidden');
                 document.getElementById('pdf-btn').classList.add('hidden');
             }
         } catch (error) {
             console.error(error);
+            // 🌟 หากเกิด Error ก็ให้แสดงกล่องไม่มีข้อมูลแทนเช่นกัน
             document.getElementById('history-data-section').classList.add('hidden');
             document.getElementById('no-history-msg').classList.remove('hidden');
             document.getElementById('pdf-btn').classList.add('hidden');
