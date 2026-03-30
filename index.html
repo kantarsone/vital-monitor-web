@@ -528,6 +528,7 @@
                 roleBadge = `<span style="background:var(--orange); color:white; padding:2px 6px; border-radius:5px; font-size:0.7rem; margin-left:8px;">คนไข้</span>`;
             }
 
+            // 🌟 เปลี่ยนคำว่า ปรับยศ เป็น ปรับบทบาท
             const roleSelect = `
                 <div style="margin-top: 10px; margin-left: 18px; border-top: 1px dashed var(--border); padding-top: 8px;">
                     <small><b>ปรับบทบาท:</b></small>
@@ -556,6 +557,7 @@
 
     async function changeUserRole(id, newRole, event) {
         event.stopPropagation();
+        // 🌟 เปลี่ยนคำว่า ยศ เป็น บทบาท ในกล่อง Confirm
         if(confirm(`คุณต้องการเปลี่ยนบทบาทของผู้ใช้นี้ให้กลายเป็น "${newRole}" ใช่หรือไม่?`)) {
             const res = await fetch(`${S_URL}/rest/v1/profiles?id=eq.${id}`, {
                 method: 'PATCH',
@@ -703,21 +705,6 @@
             clearInterval(fetchInterval); fetchInterval = null; 
             clearInterval(renderInterval); renderInterval = null; 
         }
-
-        if(tab === 'his') {
-            const now = new Date();
-            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-            
-            const formatDT = (d) => {
-                const pad = (n) => (n < 10 ? '0' + n : n);
-                return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-            };
-            
-            document.getElementById('st').value = formatDT(startOfDay);
-            document.getElementById('et').value = formatDT(now);
-            
-            queryHistory();
-        }
     }
 
     async function fetchRealtimeData() {
@@ -819,40 +806,41 @@
                         sm.push({ t: grouped[i].t, m: s/c });
                     }
                     
+                    let baselineVals = [];
+                    for(let i=0; i<sm.length; i++) {
+                        let s=0, c=0;
+                        for(let j=Math.max(0, i-2); j<=Math.min(sm.length-1, i+2); j++) {
+                            s += sm[j].m; 
+                            c++;
+                        }
+                        baselineVals.push(s/c);
+                    }
+                    
                     let smVals = sm.map(v => v.m);
                     let maxAmp = Math.max(...smVals);
                     let minAmp = Math.min(...smVals);
 
-                    if (maxAmp - minAmp < 30) {
+                    if (maxAmp - minAmp < 20) {
                         document.getElementById('rt-rr').innerText = "0"; 
                     } else {
                         let peakTimes = []; 
-                        let minProminence = 30; // 🌟 ใช้ Peak-to-Peak Hysteresis
-                        let lookingForPeak = true;
-                        let highest = sm[0].m;
-                        let highestT = sm[0].t;
-                        let lowest = sm[0].m;
+                        let minDistance = 2; 
+                        let minProminence = 10; 
+                        let lastPeakIndex = -minDistance;
 
-                        for (let i = 1; i < sm.length; i++) {
+                        for (let i = 1; i < sm.length - 1; i++) {
                             let curr = sm[i].m;
-                            let t = sm[i].t;
+                            let prev = sm[i - 1].m;
+                            let next = sm[i + 1].m;
+                            let baseline = baselineVals[i];
 
-                            if (lookingForPeak) {
-                                if (curr > highest) {
-                                    highest = curr;
-                                    highestT = t;
-                                } else if (highest - curr >= minProminence) {
-                                    peakTimes.push(highestT);
-                                    lookingForPeak = false;
-                                    lowest = curr;
-                                }
-                            } else {
-                                if (curr < lowest) {
-                                    lowest = curr;
-                                } else if (curr - lowest >= minProminence) {
-                                    lookingForPeak = true;
-                                    highest = curr;
-                                    highestT = t;
+                            let isPeak = (curr > prev) && (curr >= next);
+                            let isAboveBaseline = curr > (baseline + minProminence);
+
+                            if (isPeak && isAboveBaseline) {
+                                if ((i - lastPeakIndex) >= minDistance) {
+                                    peakTimes.push(sm[i].t); 
+                                    lastPeakIndex = i; 
                                 }
                             }
                         }
@@ -986,32 +974,34 @@
                     smoothedVals.push(sum / count);
                 }
 
+                let baselineVals = [];
+                for(let i = 0; i < smoothedVals.length; i++) {
+                    let sum = 0, count = 0;
+                    for(let j = Math.max(0, i - 2); j <= Math.min(smoothedVals.length - 1, i + 2); j++) {
+                        sum += smoothedVals[j];
+                        count++;
+                    }
+                    baselineVals.push(sum / count);
+                }
+
                 let breaths = 0;
-                let minProminence = 30; // 🌟 ใช้ Peak-to-Peak Hysteresis 
+                let minDistance = 2; 
+                let minProminence = 10; 
+                let lastPeakIndex = -minDistance;
 
-                if (smoothedVals.length > 0) {
-                    let lookingForPeak = true;
-                    let highest = smoothedVals[0];
-                    let lowest = smoothedVals[0];
+                for (let i = 1; i < smoothedVals.length - 1; i++) {
+                    let curr = smoothedVals[i];
+                    let prev = smoothedVals[i - 1];
+                    let next = smoothedVals[i + 1];
+                    let baseline = baselineVals[i];
 
-                    for (let i = 1; i < smoothedVals.length; i++) {
-                        let curr = smoothedVals[i];
+                    let isPeak = (curr > prev) && (curr >= next);
+                    let isAboveBaseline = curr > (baseline + minProminence);
 
-                        if (lookingForPeak) {
-                            if (curr > highest) {
-                                highest = curr;
-                            } else if (highest - curr >= minProminence) {
-                                breaths++;
-                                lookingForPeak = false;
-                                lowest = curr;
-                            }
-                        } else {
-                            if (curr < lowest) {
-                                lowest = curr;
-                            } else if (curr - lowest >= minProminence) {
-                                lookingForPeak = true;
-                                highest = curr;
-                            }
+                    if (isPeak && isAboveBaseline) {
+                        if ((i - lastPeakIndex) >= minDistance) {
+                            breaths++;
+                            lastPeakIndex = i; 
                         }
                     }
                 }
