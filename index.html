@@ -827,6 +827,7 @@
                     }
                     if(cG > 0) grouped.push({ t: currentG, m: Math.round(sG/cG) });
 
+                    // 🌟 Light Smoothing
                     let sm = [];
                     for(let i=0; i<grouped.length; i++) {
                         let s=0, c=0;
@@ -837,54 +838,45 @@
                         sm.push({ t: grouped[i].t, m: s/c });
                     }
                     
-                    let baselineVals = [];
-                    for(let i=0; i<sm.length; i++) {
-                        let s=0, c=0;
-                        // 🌟 หน้าต่างเวลา 21 วินาที
-                        for(let j=Math.max(0, i-10); j<=Math.min(sm.length-1, i+10); j++) {
-                            s += sm[j].m; 
-                            c++;
-                        }
-                        baselineVals.push(s/c);
-                    }
-                    
-                    let smVals = sm.map(v => v.m);
-                    let maxAmp = Math.max(...smVals);
-                    let minAmp = Math.min(...smVals);
+                    // 🌟 ระบบ Peak-to-Peak Detection (Hysteresis) แบบใหม่สำหรับหน้า Live
+                    let peakTimes = [];
+                    if (sm.length > 0) {
+                        let lookingForPeak = true;
+                        let lowestValley = sm[0].m;
+                        let highestPeak = sm[0].m;
+                        let minAmplitude = 40; // Peak-to-Valley threshold
 
-                    if (maxAmp - minAmp < 20) {
-                        document.getElementById('rt-rr').innerText = "0"; 
-                    } else {
-                        let peakTimes = []; 
-                        let minDistance = 2; 
-                        let minProminence = 15; // 🌟 ปรับลดระดับความสูงที่ถือเป็นยอดคลื่น
-                        let lastPeakIndex = -minDistance;
-
-                        for (let i = 1; i < sm.length - 1; i++) {
+                        for (let i = 1; i < sm.length; i++) {
                             let curr = sm[i].m;
-                            let prev = sm[i - 1].m;
-                            let next = sm[i + 1].m;
-                            let baseline = baselineVals[i];
 
-                            let isPeak = (curr > prev) && (curr >= next);
-                            let isAboveBaseline = (curr - baseline) >= minProminence;
-
-                            if (isPeak && isAboveBaseline) {
-                                if ((i - lastPeakIndex) >= minDistance) {
-                                    peakTimes.push(sm[i].t); 
-                                    lastPeakIndex = i; 
+                            if (lookingForPeak) {
+                                if (curr > highestPeak) {
+                                    highestPeak = curr;
+                                } else if (highestPeak - curr >= minAmplitude) {
+                                    // ตกลงมาจากยอดคลื่นเกิน Threshold แล้ว นับเป็น 1 Peak!
+                                    peakTimes.push(sm[i - 1].t);
+                                    lookingForPeak = false;
+                                    lowestValley = curr;
+                                }
+                            } else {
+                                if (curr < lowestValley) {
+                                    lowestValley = curr;
+                                } else if (curr - lowestValley >= minAmplitude) {
+                                    // ขึ้นมาจากจุดต่ำสุดเกิน Threshold แล้ว กลับไปรอจับ Peak ใหม่
+                                    lookingForPeak = true;
+                                    highestPeak = curr;
                                 }
                             }
                         }
-                        
-                        if (peakTimes.length >= 2) {
-                            let totalInterval = peakTimes[peakTimes.length - 1] - peakTimes[0];
-                            let avgInterval = totalInterval / (peakTimes.length - 1);
-                            let liveRR = Math.round(60000 / avgInterval);
-                            document.getElementById('rt-rr').innerText = liveRR;
-                        } else {
-                            document.getElementById('rt-rr').innerText = "--";
-                        }
+                    }
+                    
+                    if (peakTimes.length >= 2) {
+                        let totalInterval = peakTimes[peakTimes.length - 1] - peakTimes[0];
+                        let avgInterval = totalInterval / (peakTimes.length - 1);
+                        let liveRR = Math.round(60000 / avgInterval);
+                        document.getElementById('rt-rr').innerText = liveRR;
+                    } else {
+                        document.getElementById('rt-rr').innerText = "--";
                     }
                     
                     lastRrCalcTime = now; 
@@ -1002,6 +994,7 @@
                 const avgBpm = validBpms.length > 0 ? Math.round(validBpms.reduce((a, b) => a + b, 0) / validBpms.length) : "--";
                 const avgSpo2 = validSpo2s.length > 0 ? Math.round(validSpo2s.reduce((a, b) => a + b, 0) / validSpo2s.length) : "--";
                 
+                // 🌟 Light Smoothing
                 let smoothedVals = [];
                 for(let i = 0; i < vals.length; i++) {
                     let sum = 0, count = 0;
@@ -1012,35 +1005,34 @@
                     smoothedVals.push(sum / count);
                 }
 
-                let baselineVals = [];
-                for(let i = 0; i < smoothedVals.length; i++) {
-                    let sum = 0, count = 0;
-                    // 🌟 หน้าต่างเวลาคำนวณเส้นฐานให้กว้างขึ้นเป็น 31 วินาที เพื่อไม่ให้เส้นมันวิ่งตามคลื่น
-                    for(let j = Math.max(0, i - 15); j <= Math.min(smoothedVals.length - 1, i + 15); j++) {
-                        sum += smoothedVals[j];
-                        count++;
-                    }
-                    baselineVals.push(sum / count);
-                }
-
+                // 🌟 ระบบ Peak-to-Peak Detection (Hysteresis) แบบใหม่สำหรับหน้า History
                 let breaths = 0;
-                let minDistance = 2; 
-                let minProminence = 15; // 🌟 ปรับลดระดับให้จับยอดคลื่นได้แม้คลื่นไม่สูงมาก
-                let lastPeakIndex = -minDistance;
+                if (smoothedVals.length > 0) {
+                    let lookingForPeak = true;
+                    let lowestValley = smoothedVals[0];
+                    let highestPeak = smoothedVals[0];
+                    let minAmplitude = 40; // Peak-to-Valley threshold
 
-                for (let i = 1; i < smoothedVals.length - 1; i++) {
-                    let curr = smoothedVals[i];
-                    let prev = smoothedVals[i - 1];
-                    let next = smoothedVals[i + 1];
-                    let baseline = baselineVals[i];
+                    for (let i = 1; i < smoothedVals.length; i++) {
+                        let curr = smoothedVals[i];
 
-                    let isPeak = (curr > prev) && (curr >= next);
-                    let isAboveBaseline = (curr - baseline) >= minProminence;
-
-                    if (isPeak && isAboveBaseline) {
-                        if ((i - lastPeakIndex) >= minDistance) {
-                            breaths++;
-                            lastPeakIndex = i; 
+                        if (lookingForPeak) {
+                            if (curr > highestPeak) {
+                                highestPeak = curr;
+                            } else if (highestPeak - curr >= minAmplitude) {
+                                // กราฟตกลงมาจากยอดคลื่นเกิน Threshold ถือว่าเป็น 1 การหายใจ
+                                breaths++;
+                                lookingForPeak = false;
+                                lowestValley = curr;
+                            }
+                        } else {
+                            if (curr < lowestValley) {
+                                lowestValley = curr;
+                            } else if (curr - lowestValley >= minAmplitude) {
+                                // กราฟขึ้นมาจากจุดต่ำสุดเกิน Threshold กลับไปรอจับจุดสูงสุดใหม่
+                                lookingForPeak = true;
+                                highestPeak = curr;
+                            }
                         }
                     }
                 }
@@ -1069,7 +1061,6 @@
                 
                 let calculatedWidth = aggregatedData.length * 40; 
                 
-                // 🌟 ป้องกันกราฟแตกหายไปเมื่อข้อมูลยาวเกิน
                 if (calculatedWidth > 32000) calculatedWidth = 32000;
 
                 if (calculatedWidth > scrollContainer.clientWidth - 40) {
