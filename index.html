@@ -699,7 +699,7 @@
         lastMValue = -1;
     }
 
-    function switchTab(tab) {
+    async function switchTab(tab) {
         ['rt', 'his', 'prof'].forEach(c => {
             document.getElementById(`${c}-content`).classList.toggle('hidden', c !== tab);
             document.getElementById(`${c}-btn`).classList.toggle('active', c === tab);
@@ -723,26 +723,47 @@
         }
 
         if(tab === 'his') {
-            // 🌟 1. ล้างค่าเวลาให้เป็นช่องว่าง (--/--/---- --:--) บังคับให้ผู้ใช้เลือกเวลาเอง
+            // 🌟 1. ล้างเวลาให้เป็นช่องว่าง (--/--/---- --:--) บังคับให้เลือกเอง
             document.getElementById('st').value = "";
             document.getElementById('et').value = "";
             
-            // 🌟 2. เซ็ตค่าตัวเลขทั้งหมดให้แสดงเป็น -- ไว้ก่อน
+            // 🌟 2. รีเซ็ตค่าสถิติเป็น --
             document.getElementById('his-total-breaths').innerText = "--";
             document.getElementById('his-rr').innerText = "--";
             document.getElementById('his-bpm').innerText = "--";
             document.getElementById('his-spo2').innerText = "--";
             
-            // 🌟 3. โชว์โครงหน้าต่างกราฟรอไว้ และซ่อนกล่อง "ยังไม่มีประวัติ"
-            document.getElementById('history-data-section').classList.remove('hidden');
-            document.getElementById('no-history-msg').classList.add('hidden');
-            document.getElementById('pdf-btn').classList.add('hidden'); // ซ่อนปุ่ม PDF ไปก่อน
-            
-            // 🌟 4. ล้างข้อมูลกราฟให้เป็นกราฟเปล่าสะอาด
+            // ล้างข้อมูลกราฟ
             if (historyChart) {
                 historyChart.data.labels = [];
                 historyChart.data.datasets[0].data = [];
                 historyChart.update('none');
+            }
+
+            // ซ่อนทั้งคู่ก่อน เพื่อรอดึงข้อมูลเช็คสถานะแป๊บเดียว
+            document.getElementById('history-data-section').classList.add('hidden');
+            document.getElementById('no-history-msg').classList.add('hidden');
+            document.getElementById('pdf-btn').classList.add('hidden');
+
+            try {
+                // 🌟 3. แอบเช็คว่า User คนนี้ "เคยมี" ข้อมูลในระบบเลยหรือไม่ (แค่ 1 record ก็พอ)
+                const url = `${S_URL}/rest/v1/breath_readings?select=id&patient_id=eq.${viewingUser.id}&limit=1`;
+                const res = await fetch(url, { 
+                    headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` },
+                    cache: 'no-store'
+                });
+                const checkData = await res.json();
+
+                if (checkData && checkData.length > 0) {
+                    // 👉 ถ้า "เคยมี" ข้อมูล (User ที่ใช้ประจำ) -> โชว์โครงกราฟเปล่า รอให้เลือกเวลา
+                    document.getElementById('history-data-section').classList.remove('hidden');
+                } else {
+                    // 👉 ถ้า "ไม่เคยมีข้อมูลเลย" (User อื่นที่ไม่ได้เชื่อมต่อ) -> โชว์โฟลเดอร์ไม่มีประวัติ
+                    document.getElementById('no-history-msg').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error("เช็คประวัติเบื้องต้นไม่สำเร็จ", err);
+                document.getElementById('no-history-msg').classList.remove('hidden');
             }
         }
     }
