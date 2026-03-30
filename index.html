@@ -715,8 +715,8 @@
             lastSuccessfulFetchTime = 0; 
             lastF = 0; lastV = 0; lastMValue = -1; 
             
-            if(!fetchInterval) fetchInterval = setInterval(fetchRealtimeData, 1000); 
-            if(!renderInterval) renderInterval = setInterval(processBufferAndLights, 200); 
+            if(!fetchInterval) fetchInterval = setInterval(fetchRealtimeData, 500); 
+            if(!renderInterval) renderInterval = setInterval(processBufferAndLights, 80); 
         } else { 
             clearInterval(fetchInterval); fetchInterval = null; 
             clearInterval(renderInterval); renderInterval = null; 
