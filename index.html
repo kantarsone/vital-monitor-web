@@ -20,7 +20,7 @@
         
         .req { color: var(--red); margin-left: 3px; font-weight: bold; font-size: 1rem; }
 
-        .main-frame { background: var(--card); padding: 30px; border-radius: 25px; border: 2px solid var(--border); box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 1100px; display: flex; flex-direction: column; align-self: center; }
+        .main-frame { background: var(--card); padding: 30px; border-radius: 25px; border: 2px solid var(--border); box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 1100px; display: flex; flex-direction: column; align-self: center; box-sizing: border-box; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 3px solid var(--border); padding-bottom: 15px; }
         .status-badge { background: var(--status-bg); padding: 8px 14px; border-radius: 10px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 8px; border: 2px solid var(--border); }
         .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; transition: 0.3s; }
@@ -28,11 +28,12 @@
 
         #alert-bar { background: var(--orange); color: white; padding: 15px; border-radius: 15px; margin-bottom: 20px; text-align: center; font-weight: bold; font-size: 1.1rem; display: none; border: 3px solid rgba(255,255,255,0.3); }
 
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab-btn { padding: 10px 20px; border-radius: 10px; border: 2px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; font-weight: bold; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab-btn { padding: 10px 20px; border-radius: 10px; border: 2px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; font-weight: bold; transition: 0.2s; }
         .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
         
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
+        /* 🌟 ปรับ Grid ให้ยืดหยุ่นรองรับมือถือ */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
         .card { background: var(--bg); padding: 25px; border-radius: 20px; border: 2px solid var(--border); text-align: center; }
         .val { font-size: 4rem; font-weight: 900; line-height: 1; margin: 10px 0; }
         
@@ -44,7 +45,8 @@
         .p-val { flex: 1; font-size: 1.1rem; word-break: break-all; }
 
         .doctor-home, .admin-home { animation: fadeIn 0.5s; }
-        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        /* 🌟 ปรับ Grid ของหมอให้ยืดหยุ่น */
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: var(--primary); color: white; padding: 30px; border-radius: 20px; text-align: center; }
         .stat-card h3 { margin: 0; font-size: 1.2rem; opacity: 0.9; }
         .stat-card .stat-val { font-size: 3.5rem; font-weight: 800; }
@@ -56,6 +58,22 @@
         .restore-btn:hover { color: var(--green); transform: scale(1.1); }
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 🌟 โค้ดบังคับให้จัดหน้าจอสวยงามเมื่อเปิดด้วยมือถือ */
+        @media (max-width: 768px) {
+            .header { flex-direction: column; gap: 15px; text-align: center; }
+            #device-status-badges { flex-wrap: wrap; justify-content: center; width: 100%; }
+            .tabs { flex-wrap: wrap; }
+            .tab-btn { flex: 1; text-align: center; font-size: 0.9rem; padding: 10px; }
+            .p-row { flex-direction: column; }
+            .p-label { width: 100%; margin-bottom: 5px; color: var(--gray); font-size: 0.9rem; }
+            .val { font-size: 3rem; }
+            .no-print { flex-direction: column; align-items: stretch !important; gap: 10px; }
+            .no-print > div { width: 100%; }
+            .no-print input { width: 100%; box-sizing: border-box; }
+            .no-print button { width: 100%; margin: 0 !important; }
+            #signup-extra > div { grid-template-columns: 1fr !important; }
+        }
 
         /* ---------------------------------------------------
            โค้ดจัดรูปแบบสำหรับการปริ้น PDF 
@@ -73,18 +91,18 @@
             #rt-content { display: none !important; }
 
             .profile-table { border: 2px solid #000; border-radius: 0; background: transparent; margin-top: 5px; margin-bottom: 10px; }
-            .p-row { border-bottom: 1px solid #666; padding: 6px 15px; }
+            .p-row { border-bottom: 1px solid #666; padding: 6px 15px; flex-direction: row;}
             .p-row:last-child { border-bottom: none; }
             .p-label { color: #000; width: 180px; font-size: 1rem; }
             .p-val { font-size: 1rem; font-weight: normal; }
 
             .print-time-box { text-align: center; border: 1px solid #000; padding: 6px; margin-bottom: 10px; font-weight: bold; background: #f9fafb; font-size: 1rem; }
 
-            #his-content .grid { display: flex !important; border: 2px solid #000; border-radius: 0; gap: 0; margin-bottom: 15px; background: #fff; }
-            #his-content .card { flex: 1; border: none; border-right: 1px solid #666; border-radius: 0; padding: 10px 5px; box-shadow: none; background: transparent; }
-            #his-content .card:last-child { border-right: none; }
-            #his-content .card div:first-child { font-size: 0.85rem; font-weight: bold; color: #000; margin-bottom: 5px; }
-            #his-content .card .val { font-size: 2.2rem; color: #000 !important; margin: 0; } 
+            #history-data-section .grid { display: flex !important; border: 2px solid #000; border-radius: 0; gap: 0; margin-bottom: 15px; background: #fff; }
+            #history-data-section .card { flex: 1; border: none; border-right: 1px solid #666; border-radius: 0; padding: 10px 5px; box-shadow: none; background: transparent; }
+            #history-data-section .card:last-child { border-right: none; }
+            #history-data-section .card div:first-child { font-size: 0.85rem; font-weight: bold; color: #000; margin-bottom: 5px; }
+            #history-data-section .card .val { font-size: 2.2rem; color: #000 !important; margin: 0; } 
 
             .chart-box { 
                 border: 2px solid #000 !important; 
@@ -116,17 +134,9 @@
                 box-sizing: border-box !important;
             }
 
-            canvas {
-                max-width: 100% !important;
-                height: 100% !important;
-            }
+            canvas { max-width: 100% !important; height: 100% !important; }
 
-            #print-footer { 
-                display: flex !important; 
-                justify-content: flex-end; 
-                margin-top: 25px !important; 
-                page-break-inside: avoid; 
-            }
+            #print-footer { display: flex !important; justify-content: flex-end; margin-top: 25px !important; page-break-inside: avoid; }
             .signature-box { text-align: center; width: 250px; color: #000; }
             .sig-line { border-bottom: 1px dashed #000; height: 40px; margin-bottom: 10px; }
 
@@ -159,7 +169,7 @@
     <div id="dashboard-section" class="main-frame hidden">
         <div class="header">
             <h1 id="main-title" style="margin:0; font-size:1.6rem;">VITAL SIGN MONITORING</h1>
-            <div style="display:flex; gap:10px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
                 <div id="device-status-badges" style="display:flex; gap:10px;">
                     <div class="status-badge"><div id="m-dot" class="dot"></div> Master</div>
                     <div class="status-badge"><div id="f-dot" class="dot"></div> Flow</div>
@@ -170,7 +180,7 @@
         </div>
 
         <div id="doctor-home-view" class="doctor-home hidden">
-            <div id="doc-info" style="background: var(--status-bg); padding: 15px; border-radius: 15px; margin-bottom: 20px; display: flex; justify-content: space-between;">
+            <div id="doc-info" style="background: var(--status-bg); padding: 15px; border-radius: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; flex-wrap:wrap; gap:10px;">
                 <div><b>แพทย์ผู้ใช้งาน:</b> <span id="doc-name-display"></span></div>
                 <div><b>อีเมล:</b> <span id="doc-email-display"></span></div>
             </div>
@@ -194,7 +204,7 @@
         </div>
 
         <div id="admin-home-view" class="admin-home hidden">
-            <div style="background: var(--dark-blue); color:white; padding: 15px; border-radius: 15px; margin-bottom: 20px; display: flex; justify-content: space-between;">
+            <div style="background: var(--dark-blue); color:white; padding: 15px; border-radius: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; flex-wrap:wrap; gap:10px;">
                 <div><b>ผู้ดูแลระบบ (Admin):</b> <span id="admin-name-display"></span></div>
                 <div><b>อีเมล:</b> <span id="admin-email-display"></span></div>
             </div>
@@ -267,7 +277,7 @@
                 <div class="no-print" style="display:flex; gap:10px; align-items:flex-end; margin-bottom:20px; background:var(--bg); padding:15px; border-radius:15px; border:1px solid var(--border); flex-wrap: wrap;">
                     <div><label style="font-size:0.75rem; font-weight:bold;">เริ่ม:</label><br><input type="datetime-local" id="st"></div>
                     <div><label style="font-size:0.75rem; font-weight:bold;">จบ:</label><br><input type="datetime-local" id="et"></div>
-                    <button class="tab-btn active" onclick="queryHistory()">วิเคราะห์</button>
+                    <button class="tab-btn active" onclick="queryHistory()" style="padding: 12px 20px;">วิเคราะห์</button>
                     <button id="pdf-btn" class="tab-btn hidden" style="background:var(--dark-blue); color:white; border-color:var(--dark-blue); margin-left:auto;" onclick="triggerPrint()"><i class="fas fa-file-pdf"></i> บันทึกเป็น PDF</button>
                 </div>
                 
@@ -275,17 +285,25 @@
                     ข้อมูลการวัดระหว่างวันที่: ไม่ได้ระบุช่วงเวลา
                 </div>
 
-                <div class="grid" style="grid-template-columns: repeat(4, 1fr);">
-                    <div class="card"><div>จำนวนการหายใจ</div><div class="val" id="his-total-breaths" style="color:var(--orange);">--</div></div>
-                    <div class="card"><div>เฉลี่ย RR (/min)</div><div class="val" id="his-rr" style="color:var(--green);">--</div></div>
-                    <div class="card"><div>Avg Heart Rate (BPM)</div><div class="val" id="his-bpm" style="color:var(--red);">--</div></div>
-                    <div class="card"><div>Avg SpO2 (%)</div><div class="val" id="his-spo2" style="color:var(--primary);">--</div></div>
+                <div id="no-history-msg" class="hidden" style="text-align: center; padding: 50px 20px; background: var(--bg); border-radius: 20px; border: 2px dashed var(--border); margin-top: 20px;">
+                    <i class="fas fa-folder-open" style="font-size: 4rem; color: var(--border); margin-bottom: 15px;"></i>
+                    <h3 style="color: var(--gray); margin: 0; font-size: 1.5rem;">ยังไม่มีประวัติย้อนหลัง</h3>
+                    <p style="color: var(--gray); font-size: 1rem; margin-top: 10px;">(ระบบไม่พบข้อมูลการวัดในช่วงเวลาที่คุณเลือก หรือยังไม่เคยวัดเลย)</p>
                 </div>
-                
-                <div class="chart-box" style="padding: 0;">
-                    <div id="history-scroll-container" style="width: 100%; height: 100%; overflow-x: auto; overflow-y: hidden; padding: 20px; box-sizing: border-box;">
-                        <div id="history-inner-container" style="position: relative; height: 100%; width: 100%;">
-                            <canvas id="historyChart"></canvas>
+
+                <div id="history-data-section" class="hidden">
+                    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                        <div class="card"><div>จำนวนการหายใจ</div><div class="val" id="his-total-breaths" style="color:var(--orange);">--</div></div>
+                        <div class="card"><div>เฉลี่ย RR (/min)</div><div class="val" id="his-rr" style="color:var(--green);">--</div></div>
+                        <div class="card"><div>Avg Heart Rate (BPM)</div><div class="val" id="his-bpm" style="color:var(--red);">--</div></div>
+                        <div class="card"><div>Avg SpO2 (%)</div><div class="val" id="his-spo2" style="color:var(--primary);">--</div></div>
+                    </div>
+                    
+                    <div class="chart-box" style="padding: 0;">
+                        <div id="history-scroll-container" style="width: 100%; height: 100%; overflow-x: auto; overflow-y: hidden; padding: 20px; box-sizing: border-box;">
+                            <div id="history-inner-container" style="position: relative; height: 100%; width: 100%;">
+                                <canvas id="historyChart"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -306,6 +324,7 @@
     const S_URL = "https://qeckiglbicuajldrmuco.supabase.co";
     const S_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlY2tpZ2xiaWN1YWpsZHJtdWNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTA5NjIsImV4cCI6MjA4MTM4Njk2Mn0.XK9jd31gGtt7jYWotIwd5LQAhqM7QBFnZs1izlZMFp0";
     let isLoginMode = true, liveChart, historyChart, currentUser = null;
+    let viewingUser = null; 
     let fetchInterval, renderInterval;
     
     let dataBuffer = [];
@@ -528,7 +547,6 @@
                 roleBadge = `<span style="background:var(--orange); color:white; padding:2px 6px; border-radius:5px; font-size:0.7rem; margin-left:8px;">คนไข้</span>`;
             }
 
-            // 🌟 เปลี่ยนคำว่า ปรับยศ เป็น ปรับบทบาท
             const roleSelect = `
                 <div style="margin-top: 10px; margin-left: 18px; border-top: 1px dashed var(--border); padding-top: 8px;">
                     <small><b>ปรับบทบาท:</b></small>
@@ -557,7 +575,6 @@
 
     async function changeUserRole(id, newRole, event) {
         event.stopPropagation();
-        // 🌟 เปลี่ยนคำว่า ยศ เป็น บทบาท ในกล่อง Confirm
         if(confirm(`คุณต้องการเปลี่ยนบทบาทของผู้ใช้นี้ให้กลายเป็น "${newRole}" ใช่หรือไม่?`)) {
             const res = await fetch(`${S_URL}/rest/v1/profiles?id=eq.${id}`, {
                 method: 'PATCH',
@@ -605,6 +622,7 @@
     }
 
     function showMonitor(user) {
+        viewingUser = user; 
         document.getElementById('main-title').innerText = "VITAL SIGN MONITORING";
         document.getElementById('doctor-home-view').classList.add('hidden');
         document.getElementById('admin-home-view').classList.add('hidden');
@@ -615,10 +633,8 @@
         
         if(currentRole === 'doctor' || currentRole === 'admin') {
             document.getElementById('back-to-home').classList.remove('hidden');
-            document.getElementById('pdf-btn').classList.remove('hidden');
         } else {
             document.getElementById('back-to-home').classList.add('hidden');
-            document.getElementById('pdf-btn').classList.add('hidden');
         }
         
         updateProfileUI(user.id, user.email, user);
@@ -699,17 +715,33 @@
             lastSuccessfulFetchTime = 0; 
             lastF = 0; lastV = 0; lastMValue = -1; 
             
-            if(!fetchInterval) fetchInterval = setInterval(fetchRealtimeData, 500); 
-            if(!renderInterval) renderInterval = setInterval(processBufferAndLights, 80); 
+            if(!fetchInterval) fetchInterval = setInterval(fetchRealtimeData, 1000); 
+            if(!renderInterval) renderInterval = setInterval(processBufferAndLights, 200); 
         } else { 
             clearInterval(fetchInterval); fetchInterval = null; 
             clearInterval(renderInterval); renderInterval = null; 
+        }
+
+        if(tab === 'his') {
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            
+            const formatDT = (d) => {
+                const pad = (n) => (n < 10 ? '0' + n : n);
+                return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+            };
+            
+            document.getElementById('st').value = formatDT(startOfDay);
+            document.getElementById('et').value = formatDT(now);
+            
+            queryHistory();
         }
     }
 
     async function fetchRealtimeData() {
         try {
-            const res = await fetch(`${S_URL}/rest/v1/breath_readings?select=*&order=t.desc&limit=30`, { 
+            // 🔥 ดึงข้อมูลมาโชว์หน้า Live "เฉพาะข้อมูลที่เป็น ID ของคนนี้เท่านั้น"
+            const res = await fetch(`${S_URL}/rest/v1/breath_readings?select=*&patient_id=eq.${viewingUser.id}&order=t.desc&limit=30`, { 
                 headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` },
                 cache: 'no-store'
             });
@@ -895,6 +927,9 @@
         const t1 = new Date(s).getTime(), t2 = new Date(e).getTime();
         if (t1 >= t2) return alert("เวลาเริ่มต้นต้องน้อยกว่าเวลาสิ้นสุด");
 
+        // 🌟 ซ่อนกราฟก่อน แล้วโชว์ข้อความกำลังโหลด
+        document.getElementById('no-history-msg').classList.add('hidden');
+        document.getElementById('history-data-section').classList.remove('hidden');
         document.getElementById('his-total-breaths').innerText = "กำลังโหลด...";
         document.getElementById('his-rr').innerText = "รอสักครู่...";
 
@@ -904,7 +939,8 @@
 
         try {
             while(true) {
-                const url = `${S_URL}/rest/v1/breath_readings?select=m,bpm,spo2,t&t=gte.${t1}&t=lte.${t2}&order=t.asc&limit=${chunkSize}&offset=${currentOffset}`;
+                // 🔥 ค้นหาประวัติเฉพาะ ID ของคนๆ นี้เท่านั้น (แยกขาด 100%)
+                const url = `${S_URL}/rest/v1/breath_readings?select=m,bpm,spo2,t&patient_id=eq.${viewingUser.id}&t=gte.${t1}&t=lte.${t2}&order=t.asc&limit=${chunkSize}&offset=${currentOffset}`;
                 const res = await fetch(url, { 
                     headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` },
                     cache: 'no-store'
@@ -924,6 +960,15 @@
             const data = allData;
             
             if(data && data.length > 0) {
+                // 🌟 ถ้าพบข้อมูล (ซ่อนกรอบข้อความ -> โชว์กราฟ)
+                document.getElementById('history-data-section').classList.remove('hidden');
+                document.getElementById('no-history-msg').classList.add('hidden');
+                
+                let currentRole = currentUser.role || 'patient';
+                if(currentRole === 'doctor' || currentRole === 'admin') {
+                    document.getElementById('pdf-btn').classList.remove('hidden');
+                }
+
                 let groupMs = 1000; 
 
                 let aggregatedData = [];
@@ -1041,15 +1086,17 @@
                 historyChart.update();
 
             } else { 
-                document.getElementById('his-total-breaths').innerText = "--";
-                document.getElementById('his-rr').innerText = "--";
-                alert("ไม่พบข้อมูลในช่วงเวลาที่เลือก (อาจเกิดจากไม่ได้เปิดเครื่องในช่วงเวลานั้น)"); 
+                // 🌟 ถ้า "ไม่พบข้อมูล" (ซ่อนกราฟ -> โชว์กรอบข้อความสวยๆ แจ้งเตือนแทน)
+                document.getElementById('history-data-section').classList.add('hidden');
+                document.getElementById('no-history-msg').classList.remove('hidden');
+                document.getElementById('pdf-btn').classList.add('hidden'); // ซ่อนปุ่ม PDF เพราะไม่มีข้อมูลให้ปริ้น
             }
         } catch (error) {
             console.error(error);
-            alert("เกิดข้อผิดพลาดในการดึงข้อมูล โปรดลองใหม่อีกครั้ง");
-            document.getElementById('his-total-breaths').innerText = "--";
-            document.getElementById('his-rr').innerText = "--";
+            // 🌟 Error ตอนดึงข้อมูล ก็ให้โชว์ว่าประวัติว่างเช่นกัน
+            document.getElementById('history-data-section').classList.add('hidden');
+            document.getElementById('no-history-msg').classList.remove('hidden');
+            document.getElementById('pdf-btn').classList.add('hidden');
         }
     }
 
