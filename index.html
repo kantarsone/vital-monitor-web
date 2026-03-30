@@ -740,7 +740,6 @@
 
     async function fetchRealtimeData() {
         try {
-            // 🔥 ดึงข้อมูลมาโชว์หน้า Live "เฉพาะข้อมูลที่เป็น ID ของคนนี้เท่านั้น"
             const res = await fetch(`${S_URL}/rest/v1/breath_readings?select=*&patient_id=eq.${viewingUser.id}&order=t.desc&limit=30`, { 
                 headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` },
                 cache: 'no-store'
@@ -857,7 +856,7 @@
                     } else {
                         let peakTimes = []; 
                         let minDistance = 2; 
-                        let minProminence = 10; 
+                        let minProminence = 40; // 🌟 เพิ่มความชัดเจนของยอดคลื่น
                         let lastPeakIndex = -minDistance;
 
                         for (let i = 1; i < sm.length - 1; i++) {
@@ -867,7 +866,7 @@
                             let baseline = baselineVals[i];
 
                             let isPeak = (curr > prev) && (curr >= next);
-                            let isAboveBaseline = curr > (baseline + minProminence);
+                            let isAboveBaseline = (curr - baseline) > minProminence;
 
                             if (isPeak && isAboveBaseline) {
                                 if ((i - lastPeakIndex) >= minDistance) {
@@ -878,13 +877,10 @@
                         }
                         
                         if (peakTimes.length >= 2) {
-                            let lastPeak = peakTimes[peakTimes.length - 1];
-                            let prevPeak = peakTimes[peakTimes.length - 2];
-                            let interval = lastPeak - prevPeak;
-                            if (interval > 0) {
-                                let liveRR = Math.round(60000 / interval);
-                                document.getElementById('rt-rr').innerText = liveRR;
-                            }
+                            let totalInterval = peakTimes[peakTimes.length - 1] - peakTimes[0];
+                            let avgInterval = totalInterval / (peakTimes.length - 1);
+                            let liveRR = Math.round(60000 / avgInterval);
+                            document.getElementById('rt-rr').innerText = liveRR;
                         } else {
                             document.getElementById('rt-rr').innerText = "--";
                         }
@@ -926,7 +922,6 @@
         const t1 = new Date(s).getTime(), t2 = new Date(e).getTime();
         if (t1 >= t2) return alert("เวลาเริ่มต้นต้องน้อยกว่าเวลาสิ้นสุด");
 
-        // 🌟 ซ่อนกราฟก่อน แล้วโชว์ข้อความกำลังโหลด
         document.getElementById('no-history-msg').classList.add('hidden');
         document.getElementById('history-data-section').classList.remove('hidden');
         document.getElementById('his-total-breaths').innerText = "กำลังโหลด...";
@@ -938,7 +933,6 @@
 
         try {
             while(true) {
-                // 🔥 ค้นหาประวัติเฉพาะ ID ของคนๆ นี้เท่านั้น (แยกขาด 100%)
                 const url = `${S_URL}/rest/v1/breath_readings?select=m,bpm,spo2,t&patient_id=eq.${viewingUser.id}&t=gte.${t1}&t=lte.${t2}&order=t.asc&limit=${chunkSize}&offset=${currentOffset}`;
                 const res = await fetch(url, { 
                     headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` },
@@ -959,7 +953,6 @@
             const data = allData;
             
             if(data && data.length > 0) {
-                // 🌟 ถ้าพบข้อมูล (ซ่อนกรอบข้อความ -> โชว์กราฟ)
                 document.getElementById('history-data-section').classList.remove('hidden');
                 document.getElementById('no-history-msg').classList.add('hidden');
                 
@@ -1030,7 +1023,7 @@
 
                 let breaths = 0;
                 let minDistance = 2; 
-                let minProminence = 10; 
+                let minProminence = 40; // 🌟 เพิ่มความสูงคลื่นขั้นต่ำ ตัด Noise ออก
                 let lastPeakIndex = -minDistance;
 
                 for (let i = 1; i < smoothedVals.length - 1; i++) {
@@ -1040,7 +1033,7 @@
                     let baseline = baselineVals[i];
 
                     let isPeak = (curr > prev) && (curr >= next);
-                    let isAboveBaseline = curr > (baseline + minProminence);
+                    let isAboveBaseline = (curr - baseline) > minProminence;
 
                     if (isPeak && isAboveBaseline) {
                         if ((i - lastPeakIndex) >= minDistance) {
@@ -1050,10 +1043,9 @@
                     }
                 }
                 
-                const actualDurationMs = aggregatedData[aggregatedData.length - 1].t - aggregatedData[0].t;
-                let diffMinutes = actualDurationMs / 60000;
-                
-                if (diffMinutes <= 0) diffMinutes = (t2 - t1) / 60000; 
+                // 🌟 บังคับใช้ตัวหารนาที จากช่วงเวลาที่คุณกดเลือกเป๊ะๆ (เพื่อไม่ให้ค่าเฉลี่ยโดด)
+                let diffMinutes = (t2 - t1) / 60000; 
+                if (diffMinutes <= 0) diffMinutes = 1; 
 
                 const avgRR = Math.round(breaths / diffMinutes);
 
@@ -1076,6 +1068,9 @@
                 
                 let calculatedWidth = aggregatedData.length * 40; 
                 
+                // 🌟 จำกัดความกว้าง Canvas ป้องกันเบราว์เซอร์รับไม่ไหวแล้วรูปแตก
+                if (calculatedWidth > 32000) calculatedWidth = 32000;
+
                 if (calculatedWidth > scrollContainer.clientWidth - 40) {
                     innerContainer.style.width = calculatedWidth + 'px';
                 } else {
@@ -1085,14 +1080,12 @@
                 historyChart.update();
 
             } else { 
-                // 🌟 ถ้า "ไม่พบข้อมูล" (ซ่อนกราฟ -> โชว์กรอบข้อความสวยๆ แจ้งเตือนแทน)
                 document.getElementById('history-data-section').classList.add('hidden');
                 document.getElementById('no-history-msg').classList.remove('hidden');
-                document.getElementById('pdf-btn').classList.add('hidden'); // ซ่อนปุ่ม PDF เพราะไม่มีข้อมูลให้ปริ้น
+                document.getElementById('pdf-btn').classList.add('hidden'); 
             }
         } catch (error) {
             console.error(error);
-            // 🌟 Error ตอนดึงข้อมูล ก็ให้โชว์ว่าประวัติว่างเช่นกัน
             document.getElementById('history-data-section').classList.add('hidden');
             document.getElementById('no-history-msg').classList.remove('hidden');
             document.getElementById('pdf-btn').classList.add('hidden');
