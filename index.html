@@ -199,7 +199,7 @@
                     <div class="stat-val" id="offline-users">0</div>
                 </div>
             </div>
-            <h2 style="margin-bottom:15px;"><i class="fas fa-users"></i> รายชื่อคนไข้ (ที่ยังใช้งาน)</h2>
+            <h2 style="margin-bottom:15px;"><i class="fas fa-users"></i> รายชื่อคนไข้</h2>
             <div id="doctor-patient-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;"></div>
         </div>
 
@@ -325,7 +325,7 @@
     const S_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlY2tpZ2xiaWN1YWpsZHJtdWNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTA5NjIsImV4cCI6MjA4MTM4Njk2Mn0.XK9jd31gGtt7jYWotIwd5LQAhqM7QBFnZs1izlZMFp0";
     let isLoginMode = true, liveChart, historyChart, currentUser = null;
     let viewingUser = null; 
-    let fetchInterval, renderInterval;
+    let fetchInterval, renderInterval, doctorInterval;
     
     let dataBuffer = [];
     let isFirstFetch = true; 
@@ -448,9 +448,52 @@
         }
     }
 
+    // 🌟 ฟังก์ชันใหม่: อัปเดตสถานะออนไลน์ของคนไข้บนหน้าจอหมอแบบ Real-time
+    async function updateDoctorOnlineStatus() {
+        if (document.getElementById('doctor-home-view').classList.contains('hidden')) return;
+
+        try {
+            const twentySecAgo = Date.now() - 20000;
+            const activeRes = await fetch(`${S_URL}/rest/v1/breath_readings?select=patient_id&t=gte.${twentySecAgo}`, {
+                headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` },
+                cache: 'no-store'
+            });
+            const activeData = await activeRes.json();
+            const onlinePatientIds = [...new Set(activeData.map(d => d.patient_id))];
+
+            let onlineCount = 0;
+            let totalCount = 0;
+
+            const cards = document.querySelectorAll('#doctor-patient-list .patient-card');
+            cards.forEach(card => {
+                totalCount++;
+                const patientId = card.dataset.id; 
+                const isOnline = onlinePatientIds.includes(patientId);
+                if (isOnline) onlineCount++;
+
+                const dot = card.querySelector('.dot');
+                const statusText = card.querySelector('.status-text');
+                
+                if (isOnline) {
+                    dot.style.background = "var(--green)";
+                    dot.style.boxShadow = "0 0 5px var(--green)";
+                    if(statusText) { statusText.innerText = "สถานะ: กำลังส่งข้อมูล"; statusText.style.color = "var(--green)"; }
+                } else {
+                    dot.style.background = "var(--red)";
+                    dot.style.boxShadow = "none";
+                    if(statusText) { statusText.innerText = "สถานะ: ออฟไลน์"; statusText.style.color = "var(--red)"; }
+                }
+            });
+
+            document.getElementById('online-users').innerText = onlineCount;
+            document.getElementById('offline-users').innerText = totalCount - onlineCount;
+        } catch (e) { console.error("Error updating online status:", e); }
+    }
+
     async function showDoctorHome() {
         if(fetchInterval) clearInterval(fetchInterval);
         if(renderInterval) clearInterval(renderInterval);
+        if(doctorInterval) clearInterval(doctorInterval);
         
         document.getElementById('main-title').innerText = "DOCTOR DASHBOARD";
         document.getElementById('doctor-home-view').classList.remove('hidden');
@@ -465,14 +508,15 @@
         const patients = await res.json();
         
         document.getElementById('total-users').innerText = patients.length;
-        document.getElementById('online-users').innerText = 0; 
-        document.getElementById('offline-users').innerText = patients.length; 
+        document.getElementById('online-users').innerText = "..."; 
+        document.getElementById('offline-users').innerText = "..."; 
         
         const list = document.getElementById('doctor-patient-list');
         list.innerHTML = "";
         patients.forEach(p => {
             const div = document.createElement('div');
             div.className = 'patient-card';
+            div.dataset.id = p.id; // เก็บ ID ไว้ใช้อัปเดตสถานะ
             const hnDisplay = p.hn ? String(p.hn).padStart(6, '0') : "--";
             
             div.innerHTML = `
@@ -480,19 +524,25 @@
                     <i class="fas fa-trash-alt"></i>
                 </button>
                 <div style="padding-right: 30px;">
-                    <strong><span class="dot" style="background: var(--red); display: inline-block; margin-right: 8px;"></span>${p.first_name || 'ไม่ระบุชื่อ'} ${p.last_name || ''}</strong><br>
+                    <strong><span class="dot" style="background: var(--gray); display: inline-block; margin-right: 8px;"></span>${p.first_name || 'ไม่ระบุชื่อ'} ${p.last_name || ''}</strong><br>
                     <small style="margin-left: 18px;">HN: ${hnDisplay} | อีเมล: ${p.email}</small><br>
+                    <small class="status-text" style="margin-left: 18px; color: var(--gray); font-weight: bold;">สถานะ: ตรวจสอบข้อมูล...</small><br>
                     <div style="margin-top:10px; margin-left: 18px; color:var(--primary); font-weight:bold;">ดูข้อมูลคนไข้ <i class="fas fa-chevron-right"></i></div>
                 </div>
             `;
             div.onclick = () => showMonitor(p);
             list.appendChild(div);
         });
+
+        // 🌟 เรียกเช็คสถานะทันที 1 ครั้ง และตั้งให้เช็คทุกๆ 5 วินาที
+        updateDoctorOnlineStatus();
+        doctorInterval = setInterval(updateDoctorOnlineStatus, 5000);
     }
 
     async function showAdminHome() {
         if(fetchInterval) clearInterval(fetchInterval);
         if(renderInterval) clearInterval(renderInterval);
+        if(doctorInterval) clearInterval(doctorInterval);
         
         document.getElementById('main-title').innerText = "ADMIN SYSTEM MANAGEMENT";
         document.getElementById('admin-home-view').classList.remove('hidden');
@@ -622,6 +672,8 @@
     }
 
     function showMonitor(user) {
+        if(doctorInterval) clearInterval(doctorInterval);
+        
         viewingUser = user; 
         document.getElementById('main-title').innerText = "VITAL SIGN MONITORING";
         document.getElementById('doctor-home-view').classList.add('hidden');
@@ -723,30 +775,25 @@
         }
 
         if(tab === 'his') {
-            // 🌟 1. ล้างเวลาให้เป็นช่องว่าง (--/--/---- --:--) บังคับให้เลือกเอง
             document.getElementById('st').value = "";
             document.getElementById('et').value = "";
             
-            // 🌟 2. รีเซ็ตค่าสถิติเป็น --
             document.getElementById('his-total-breaths').innerText = "--";
             document.getElementById('his-rr').innerText = "--";
             document.getElementById('his-bpm').innerText = "--";
             document.getElementById('his-spo2').innerText = "--";
             
-            // ล้างข้อมูลกราฟ
             if (historyChart) {
                 historyChart.data.labels = [];
                 historyChart.data.datasets[0].data = [];
                 historyChart.update('none');
             }
 
-            // ซ่อนทั้งคู่ก่อน เพื่อรอดึงข้อมูลเช็คสถานะแป๊บเดียว
             document.getElementById('history-data-section').classList.add('hidden');
             document.getElementById('no-history-msg').classList.add('hidden');
             document.getElementById('pdf-btn').classList.add('hidden');
 
             try {
-                // 🌟 3. แอบเช็คว่า User คนนี้ "เคยมี" ข้อมูลในระบบเลยหรือไม่ (แค่ 1 record ก็พอ)
                 const url = `${S_URL}/rest/v1/breath_readings?select=id&patient_id=eq.${viewingUser.id}&limit=1`;
                 const res = await fetch(url, { 
                     headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` },
@@ -755,10 +802,8 @@
                 const checkData = await res.json();
 
                 if (checkData && checkData.length > 0) {
-                    // 👉 ถ้า "เคยมี" ข้อมูล (User ที่ใช้ประจำ) -> โชว์โครงกราฟเปล่า รอให้เลือกเวลา
                     document.getElementById('history-data-section').classList.remove('hidden');
                 } else {
-                    // 👉 ถ้า "ไม่เคยมีข้อมูลเลย" (User อื่นที่ไม่ได้เชื่อมต่อ) -> โชว์โฟลเดอร์ไม่มีประวัติ
                     document.getElementById('no-history-msg').classList.remove('hidden');
                 }
             } catch (err) {
@@ -924,6 +969,7 @@
                 }
             }
 
+            // 🌟 แก้ไข: อัปเดตเวลาให้ไฟ Flow เฉพาะเมื่อค่ามีการขยับจริงๆ (แก้ปัญหาไฟติดคู่ Master)
             if (p.m !== lastMValue) {
                 lastMValue = p.m;
                 lastF = now; 
@@ -987,7 +1033,6 @@
             const data = allData;
             
             if(data && data.length > 0) {
-                // 🌟 กรณีมีข้อมูล ให้โชว์กล่องกราฟและซ่อนกล่องข้อความ
                 document.getElementById('history-data-section').classList.remove('hidden');
                 document.getElementById('no-history-msg').classList.add('hidden');
                 
@@ -1035,7 +1080,6 @@
                 const avgBpm = validBpms.length > 0 ? Math.round(validBpms.reduce((a, b) => a + b, 0) / validBpms.length) : "--";
                 const avgSpo2 = validSpo2s.length > 0 ? Math.round(validSpo2s.reduce((a, b) => a + b, 0) / validSpo2s.length) : "--";
                 
-                // 1. Sliding Window Smoothing
                 let windowSize = 5;
                 let smoothedVals = [];
                 for(let i = 0; i < vals.length; i++) {
@@ -1049,7 +1093,6 @@
                     smoothedVals.push(sum / count);
                 }
 
-                // 2. Sliding Window Baseline
                 let baseWindowSize = 15; 
                 let baselineVals = [];
                 for(let i = 0; i < smoothedVals.length; i++) {
@@ -1063,7 +1106,6 @@
                     baselineVals.push(sum / count);
                 }
 
-                // 3. Peak Detection (Dynamic Threshold)
                 let breaths = 0;
                 let minDistance = 2; 
                 let lastPeakIndex = -minDistance;
@@ -1132,14 +1174,12 @@
                 historyChart.update();
 
             } else { 
-                // 🌟 กรณี "ไม่มีข้อมูลย้อนหลังเลย" ให้ซ่อนหน้าต่างกราฟ และโชว์กล่องไอคอนแทน
                 document.getElementById('history-data-section').classList.add('hidden');
                 document.getElementById('no-history-msg').classList.remove('hidden');
                 document.getElementById('pdf-btn').classList.add('hidden');
             }
         } catch (error) {
             console.error(error);
-            // 🌟 หากเกิด Error ก็ให้แสดงกล่องไม่มีข้อมูลแทนเช่นกัน
             document.getElementById('history-data-section').classList.add('hidden');
             document.getElementById('no-history-msg').classList.remove('hidden');
             document.getElementById('pdf-btn').classList.add('hidden');
