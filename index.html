@@ -877,7 +877,8 @@
             liveRrBuffer.push({ t: p.t, m: p.m });
             const newestT = liveRrBuffer[liveRrBuffer.length - 1].t;
             
-            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 20000);
+            // 🌟 เพิ่มเวลาเก็บ Buffer จาก 20 วิ เป็น 30 วิ จะได้มีฐานข้อมูลให้คิด RR แม่นขึ้น
+            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
             const bufferDurationMs = newestT - liveRrBuffer[0].t;
 
             if (bufferDurationMs >= 5000) {
@@ -926,12 +927,12 @@
                     let maxAmp = Math.max(...smVals);
                     let minAmp = Math.min(...smVals);
 
-                    if (maxAmp - minAmp < 20) {
+                    // 🌟 ปรับให้ยอมรับคลื่นที่แบนลงได้อีกนิดนึง (จาก 20 เหลือ 15)
+                    if (maxAmp - minAmp < 15) {
                         document.getElementById('rt-rr').innerText = "0"; 
                     } else {
                         let peakTimes = []; 
                         let minDistance = 2; 
-                        let minProminence = 10; 
                         let lastPeakIndex = -minDistance;
 
                         for (let i = 1; i < sm.length - 1; i++) {
@@ -940,10 +941,23 @@
                             let next = sm[i + 1].m;
                             let baseline = baselineVals[i];
 
-                            let isPeak = (curr > prev) && (curr >= next);
-                            let isAboveBaseline = curr > (baseline + minProminence);
+                            // 🌟 คำนวณ Dynamic Threshold สำหรับ Real-time
+                            let localStart = Math.max(0, i - 10);
+                            let localEnd = Math.min(sm.length - 1, i + 10);
+                            let localMax = -Infinity;
+                            let localMin = Infinity;
+                            for(let j = localStart; j <= localEnd; j++) {
+                                if(sm[j].m > localMax) localMax = sm[j].m;
+                                if(sm[j].m < localMin) localMin = sm[j].m;
+                            }
+                            let amplitude = localMax - localMin;
 
-                            if (isPeak && isAboveBaseline) {
+                            let dynamicThreshold = baseline + (amplitude * 0.2);
+
+                            let isPeak = (curr > prev) && (curr >= next);
+                            let isAboveThreshold = curr > dynamicThreshold;
+
+                            if (isPeak && isAboveThreshold && amplitude > 10) {
                                 if ((i - lastPeakIndex) >= minDistance) {
                                     peakTimes.push(sm[i].t); 
                                     lastPeakIndex = i; 
@@ -958,6 +972,10 @@
                             }
                             let avgInterval = totalInterval / (peakTimes.length - 1);
                             let liveRR = Math.round(60000 / avgInterval);
+                            
+                            // จำกัดการแกว่งผิดปกติ
+                            if (liveRR > 60) liveRR = 60;
+                            
                             document.getElementById('rt-rr').innerText = liveRR;
                         } else {
                             let liveRR = Math.round(peakTimes.length * (60000 / bufferDurationMs));
