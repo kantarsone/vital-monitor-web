@@ -877,7 +877,7 @@
             liveRrBuffer.push({ t: p.t, m: p.m });
             const newestT = liveRrBuffer[liveRrBuffer.length - 1].t;
             
-            // 🌟 เพิ่มเวลาเก็บ Buffer เป็น 30 วิ จะได้มีฐานข้อมูลให้คิด RR แม่นขึ้น
+            // 🌟 เพิ่มเวลาเก็บ Buffer จาก 20 วิ เป็น 30 วิ จะได้มีฐานข้อมูลให้คิด RR แม่นขึ้น
             liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
             const bufferDurationMs = newestT - liveRrBuffer[0].t;
 
@@ -929,12 +929,12 @@
                     let maxAmp = Math.max(...smVals);
                     let minAmp = Math.min(...smVals);
 
-                    // 🌟 ปรับให้ยอมรับคลื่นที่แบนลงได้อีกนิดนึง
+                    // 🌟 ปรับให้ยอมรับคลื่นที่แบนลงได้อีกนิดนึง (จาก 20 เหลือ 15)
                     if (maxAmp - minAmp < 15) {
                         document.getElementById('rt-rr').innerText = "0"; 
                     } else {
                         let peakTimes = []; 
-                        // 🌟 ลดระยะห่างขั้นต่ำลงเหลือ 1 วินาที (จับจังหวะการหายใจที่เร็วขึ้นได้)
+                        // 🌟 ลดระยะห่างขั้นต่ำลงเหลือ 1 วินาที (เพื่อให้จับจังหวะการหายใจที่เร็วขึ้นได้)
                         let minDistance = 1; 
                         let lastPeakIndex = -minDistance;
 
@@ -944,7 +944,7 @@
                             let next = sm[i + 1].m;
                             let baseline = baselineVals[i];
 
-                            // 🌟 เพิ่ม Dynamic Threshold ให้ Real-time
+                            // 🌟 คำนวณ Dynamic Threshold สำหรับ Real-time
                             let localStart = Math.max(0, i - 10);
                             let localEnd = Math.min(sm.length - 1, i + 10);
                             let localMax = -Infinity;
@@ -955,7 +955,7 @@
                             }
                             let amplitude = localMax - localMin;
 
-                            // 🌟 ลดเกณฑ์ความสูงลงนิดหน่อย (เหลือ 15%)
+                            // 🌟 ลดเกณฑ์ความสูงลงนิดหน่อย (เหลือ 15%) เผื่อกรณีคลื่นเล็กๆ
                             let dynamicThreshold = baseline + (amplitude * 0.15);
 
                             let isPeak = (curr > prev) && (curr >= next);
@@ -971,7 +971,7 @@
                         
                         if (peakTimes.length >= 2) {
                             let totalInterval = 0;
-                            // 🌟 เน้นคิดค่าเฉลี่ยจากยอดคลื่น 5 ลูกล่าสุดเป็นหลัก
+                            // 🌟 ปรับให้เน้นคิดค่าเฉลี่ยจากยอดคลื่น 5 ลูกล่าสุดเป็นหลัก (เพื่อให้ตอบสนองไวยิ่งขึ้น)
                             let startIdx = Math.max(1, peakTimes.length - 5);
                             for (let k = startIdx; k < peakTimes.length; k++) {
                                 totalInterval += (peakTimes[k] - peakTimes[k-1]);
@@ -981,6 +981,7 @@
                             
                             // จำกัดการแกว่งผิดปกติ
                             if (liveRR > 60) liveRR = 60;
+                            
                             document.getElementById('rt-rr').innerText = liveRR;
                         } else {
                             let liveRR = Math.round(peakTimes.length * (60000 / bufferDurationMs));
@@ -992,6 +993,7 @@
                 }
             }
 
+            // 🌟 แก้ไข: อัปเดตเวลาให้ไฟ Flow เฉพาะเมื่อค่ามีการขยับจริงๆ (แก้ปัญหาไฟติดคู่ Master)
             if (p.m !== lastMValue) {
                 lastMValue = p.m;
                 lastF = now; 
