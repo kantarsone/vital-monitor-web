@@ -333,7 +333,6 @@
     let lastV = 0; 
     let lastMValue = -1;
 
-    // 🌟 ตัวแปรใหม่สำหรับสูตร Peak-to-Peak (3-Cycle Avg)
     let liveRrBuffer = [];
     let lastPeakTime = 0;      
     let rrHistory = [];        
@@ -851,8 +850,14 @@
                 let minAmp = Math.min(...smVals);
                 let amplitude = maxAmp - minAmp;
 
-                if (amplitude > 15) {
-                    let dynamicThreshold = minAmp + (amplitude * 0.35); // ยอดต้องสูงกว่าฐาน 35% ของคลื่นทั้งหมด
+                // 🌟 บัคฟิกซ์: เพิ่มเกณฑ์ตัดคลื่นตาย (Flatline Threshold)
+                // สเกล 0-4095 ถ้าน้อยกว่า 80 ถือว่าเป็นแค่ Noise เซ็นเซอร์ ไม่ใช่ลมหายใจ
+                if (amplitude < 80) {
+                    document.getElementById('rt-rr').innerText = "0"; // บังคับโชว์ 0
+                    rrHistory = [];   // ล้างประวัติการคำนวณเก่าทิ้ง
+                    lastPeakTime = 0; // รีเซ็ตเวลาเริ่มต้นนับใหม่
+                } else {
+                    let dynamicThreshold = minAmp + (amplitude * 0.35); // ยอดต้องสูงกว่าฐาน 35%
                     
                     // เช็คจุดล่าสุด (จุดรองสุดท้ายเทียบกับรอบข้าง)
                     let checkIdx = sm.length - 2;
@@ -869,7 +874,6 @@
                             let intervalMs = currentPeakTime - lastPeakTime;
 
                             // เช็คว่าห่างจากยอดที่แล้วอย่างน้อย 1 วิ (กันการนับซ้อนหรือ Noise)
-                            // ถ้ายอดแรกสุด (lastPeakTime == 0) ให้จดเวลาไว้เฉยๆ ยังไม่คำนวณ
                             if (lastPeakTime > 0 && intervalMs >= 1000) {
                                 
                                 // คำนวณ RR จากระยะห่างของ 1 ลูกทันที!
