@@ -7,7 +7,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* (CSS เหมือนเดิมทุกประการ ไม่มีการเปลี่ยนแปลง) */
         :root { --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; --border: #d1d5db; --primary: #3b82f6; --green: #10b981; --red: #f43f5e; --status-bg: #e5e7eb; --orange: #fb8c00; --gray: #6b7280; --dark-blue: #1e3a8a; }
         body.dark { --bg: #020617; --card: #0f172a; --text: #f8fafc; --border: #1e293b; --status-bg: #1e293b; }
         body { font-family: 'Inter', 'Sarabun', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; transition: 0.3s; justify-content: center; }
@@ -73,9 +72,6 @@
             #signup-extra > div { grid-template-columns: 1fr !important; }
         }
 
-        /* ---------------------------------------------------
-           โค้ดจัดรูปแบบสำหรับการปริ้น PDF 
-        --------------------------------------------------- */
         .print-only { display: none !important; }
 
         @media print {
@@ -319,7 +315,6 @@
     </div>
 
 <script>
-    // (ข้อมูลการเชื่อมต่อ Supabase คงเดิม)
     const S_URL = "https://qeckiglbicuajldrmuco.supabase.co";
     const S_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlY2tpZ2xiaWN1YWpsZHJtdWNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTA5NjIsImV4cCI6MjA4MTM4Njk2Mn0.XK9jd31gGtt7jYWotIwd5LQAhqM7QBFnZs1izlZMFp0";
     let isLoginMode = true, liveChart, historyChart, currentUser = null;
@@ -336,8 +331,10 @@
     let lastMValue = -1;
 
     let liveRrBuffer = [];
+    
+    // 🌟 เปลี่ยนตัวแปรให้เป็นแบบเก็บเวลา 11 จุด (เพื่อให้ได้ระยะห่าง 10 คลื่น)
     let lastPeakTime = 0;      
-    let rrHistory = [];        
+    let peakTimesHistory = []; 
 
     function toggleAuth() {
         isLoginMode = !isLoginMode;
@@ -711,7 +708,7 @@
             dataBuffer = []; 
             liveRrBuffer = []; 
             lastPeakTime = 0;      
-            rrHistory = []; 
+            peakTimesHistory = []; // รีเซ็ตตัวแปรใหม่
             document.getElementById('rt-rr').innerText = "--"; 
             
             isFirstFetch = true; 
@@ -818,25 +815,24 @@
             document.getElementById('rt-hv').innerText = p.bpm || "--";
             document.getElementById('rt-sv').innerText = p.spo2 || "--";
 
-            // --- 🌟 อัลกอริทึม Peak-to-Peak Interval ที่ปรับปรุงใหม่ (เฉลี่ย 10 ลูกคลื่น) ---
+            // 🌟 เก็บคลื่นเข้า Buffer
             liveRrBuffer.push({ t: p.t, m: p.m });
             const newestT = liveRrBuffer[liveRrBuffer.length - 1].t;
             
-            // เก็บข้อมูลดิบไว้แค่ 15 วินาที (ขยายเวลาขึ้นนิดหน่อยเพื่อให้เก็บ 10 ลูกคลื่นได้ครบ)
+            // 🌟 ให้ความจำยาวขึ้น 15 วินาที เพื่อให้ครอบคลุมเวลา 10 คลื่นลมหายใจพอ
             liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 15000);
             const bufferDurationMs = newestT - liveRrBuffer[0].t;
 
             // รีเซ็ตค่าเป็น 0 ถ้าสัญญาณขาดหายไปนานกว่า 8 วินาที
             if(now - lastPeakTime > 8000 && lastPeakTime > 0) {
                 document.getElementById('rt-rr').innerText = "0";
-                rrHistory = []; 
-                lastPeakTime = 0; // เพิ่มบรรทัดนี้เพื่อเคลียร์เวลายอดคลื่น
+                peakTimesHistory = []; 
+                lastPeakTime = 0; 
             }
 
-            // ถ้ามีข้อมูลพอสมควรแล้ว เริ่มคำนวณ!
             if (bufferDurationMs >= 3000) {
                 
-                // 1. ทำ Smoothing ให้กราฟเนียนขึ้น (เฉลี่ย 5 จุด)
+                // 1. ทำ Smoothing
                 let sm = [];
                 for(let i=0; i<liveRrBuffer.length; i++) {
                     let sum = 0, count = 0;
@@ -847,22 +843,20 @@
                     sm.push({ t: liveRrBuffer[i].t, m: sum / count });
                 }
 
-                // 2. คำนวณ Dynamic Threshold แบบสดๆ
+                // 2. คำนวณ Dynamic Threshold
                 let smVals = sm.map(v => v.m);
                 let maxAmp = Math.max(...smVals);
                 let minAmp = Math.min(...smVals);
                 let amplitude = maxAmp - minAmp;
 
-                // 🌟 บัคฟิกซ์: เพิ่มเกณฑ์ตัดคลื่นตาย (Flatline Threshold)
-                // สเกล 0-4095 ถ้าน้อยกว่า 80 ถือว่าเป็นแค่ Noise เซ็นเซอร์ ไม่ใช่ลมหายใจ
+                // 🌟 ตัดคลื่นตาย: ถ้านิ่งเกินไป ให้เคลียร์ประวัติทิ้งให้หมดแล้วโชว์ 0
                 if (amplitude < 80) {
-                    document.getElementById('rt-rr').innerText = "0"; // บังคับโชว์ 0 ทันที
-                    rrHistory = [];   // ล้างประวัติการคำนวณทิ้ง ป้องกันค่าดีด
-                    lastPeakTime = 0; // รีเซ็ตเวลาเริ่มต้นนับใหม่
+                    document.getElementById('rt-rr').innerText = "0"; 
+                    peakTimesHistory = []; // ล้างประวัติเวลาทิ้ง ป้องกันค่าดีด
+                    lastPeakTime = 0;      // รีเซ็ตการจับยอดใหม่
                 } else {
-                    let dynamicThreshold = minAmp + (amplitude * 0.35); // ยอดต้องสูงกว่าฐาน 35%
+                    let dynamicThreshold = minAmp + (amplitude * 0.35); 
                     
-                    // เช็คจุดล่าสุด (จุดรองสุดท้ายเทียบกับรอบข้าง)
                     let checkIdx = sm.length - 2;
                     if(checkIdx > 0) {
                         let curr = sm[checkIdx];
@@ -876,36 +870,42 @@
                             let currentPeakTime = curr.t;
                             let intervalMs = currentPeakTime - lastPeakTime;
 
-                            // เช็คว่าห่างจากยอดที่แล้วอย่างน้อย 1 วิ (กันการนับซ้อนหรือ Noise)
+                            // เช็คว่าห่างจากยอดที่แล้วอย่างน้อย 1 วิ (กัน Noise)
                             if (lastPeakTime > 0 && intervalMs >= 1000) {
                                 
-                                // คำนวณ RR จากระยะห่างของ 1 ลูกทันที!
-                                let instantRR = Math.round(60000 / intervalMs);
+                                // 🌟 1. เก็บ "เวลา" ของยอดคลื่นปัจจุบันลง Array
+                                peakTimesHistory.push(currentPeakTime);
                                 
-                                // กรองค่าที่ผิดปกติ (คนปกติหายใจไม่เกิน 60 ครั้ง/นาที)
-                                if (instantRR > 0 && instantRR <= 60) {
-                                    
-                                    // 🌟 เปลี่ยนเป็นเก็บประวัติ 10 ลูกล่าสุด
-                                    rrHistory.push(instantRR);
-                                    if (rrHistory.length > 10) {
-                                        rrHistory.shift(); 
-                                    }
-
-                                    // 🌟 เฉลี่ย 10 ลูกล่าสุดเพื่อให้นิ่งสุดๆ!
-                                    let sumRR = 0;
-                                    for(let i=0; i<rrHistory.length; i++) sumRR += rrHistory[i];
-                                    let displayRR = Math.round(sumRR / rrHistory.length);
-
-                                    document.getElementById('rt-rr').innerText = displayRR;
+                                // 🌟 2. เก็บประวัติไว้ 11 ยอดล่าสุด (11 ยอด = หายใจ 10 ช่วง พอดีเป๊ะ)
+                                if (peakTimesHistory.length > 11) {
+                                    peakTimesHistory.shift(); 
                                 }
+
+                                // 🌟 3. คำนวณ RR จาก "เวลารวม" ของ 10 ช่วงล่าสุด
+                                let numIntervals = peakTimesHistory.length - 1;
+                                if (numIntervals > 0) {
+                                    let totalTimeMs = peakTimesHistory[numIntervals] - peakTimesHistory[0];
+                                    
+                                    let avgIntervalMs = totalTimeMs / numIntervals;
+                                    let displayRR = Math.round(60000 / avgIntervalMs);
+
+                                    // กรองค่าขยะ: ถ้าคำนวณแล้วได้เลขเวอร์ๆ จะไม่เอาขึ้นจอ
+                                    if (displayRR > 0 && displayRR <= 60) {
+                                        document.getElementById('rt-rr').innerText = displayRR;
+                                    }
+                                }
+                            } 
+                            // ถ้ายอดแรกสุด ให้จดเวลาไว้เฉยๆ ก่อน
+                            else if (lastPeakTime === 0) {
+                                peakTimesHistory.push(currentPeakTime);
                             }
+                            
                             lastPeakTime = currentPeakTime; // จดเวลายอดคลื่นล่าสุดไว้
                         }
                     }
                 }
             }
 
-            // 🌟 เช็คไฟสถานะ
             if (p.m !== lastMValue) {
                 lastMValue = p.m;
                 lastF = now; 
@@ -915,7 +915,6 @@
                 lastV = now; 
             }
 
-            // 🌟 เลื่อนกราฟ
             liveChart.data.labels.shift();
             liveChart.data.labels.push(""); 
             liveChart.data.datasets[0].data.shift();
