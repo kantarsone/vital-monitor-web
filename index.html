@@ -816,72 +816,88 @@
             liveRrBuffer.push({ t: p.t, m: p.m });
             const newestT = liveRrBuffer[liveRrBuffer.length - 1].t;
             
-            // 🌟 ขยายขนาดกระเป๋าเป็น 20 วินาที เพื่อรองรับการเก็บประวัติ Peak 
-            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 20000);
-            
-            // 🌟 1. เงื่อนไขตัดเป็น 0: ปรับเป็น 5000ms (5 วินาที) ตามที่ต้องการ
-            if (now - lastPeakTime > 5000 && lastPeakTime > 0) {
+            // 🌟 ให้จำข้อมูลย้อนหลัง 15 วินาที เพื่อเช็คความกว้างคลื่น
+            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 15000);
+            const bufferDurationMs = newestT - liveRrBuffer[0].t;
+
+            // 🌟 ถ้าเซ็นเซอร์ไม่ได้ส่งยอดคลื่นใหม่มาเกิน 8 วินาที ให้กลายเป็น 0
+            if(now - lastPeakTime > 8000 && lastPeakTime > 0) {
                 document.getElementById('rt-rr').innerText = "0";
                 peakTimesHistory = []; 
                 lastPeakTime = 0; 
             }
 
-            // เริ่มตรวจสอบยอดคลื่น
-            let sm = [];
-            for(let i=0; i<liveRrBuffer.length; i++) {
-                let sum = 0, count = 0;
-                for(let j=Math.max(0, i-2); j<=Math.min(liveRrBuffer.length-1, i+2); j++) {
-                    sum += liveRrBuffer[j].m; 
-                    count++;
-                }
-                sm.push({ t: liveRrBuffer[i].t, m: sum / count });
-            }
-
-            // 🌟 2. สุดยอดอัลกอริทึม Local Prominence (มองข้าม Noise และ Baseline Drift 100%)
-            let checkIdx = sm.length - 2;
-            if (checkIdx > 10) {
-                let curr = sm[checkIdx];
-                let prev = sm[checkIdx - 1];
-                let next = sm[checkIdx + 1];
-
-                let isPeak = (curr.m > prev.m) && (curr.m >= next.m);
-
-                // หาจุดต่ำสุด (Valley) ในช่วง 15 ข้อมูลล่าสุด (ประมาณ 1.5 วินาที)
-                let localMin = curr.m;
-                for(let j = Math.max(0, checkIdx - 15); j <= checkIdx; j++) {
-                    if(sm[j].m < localMin) localMin = sm[j].m;
-                }
-
-                // 🌟 ยอดคลื่นต้องสูงกว่าจุดต่ำสุดอย่างน้อย 100 หน่วย ถึงจะนับเป็นลมหายใจ! (ทิ้งคลื่นหยักเล็กๆ)
-                let isProminent = (curr.m - localMin) > 100;
-
-                if (isPeak && isProminent) {
-                    let currentPeakTime = curr.t;
-                    let intervalMs = currentPeakTime - lastPeakTime;
-
-                    if (lastPeakTime > 0 && intervalMs >= 1000) {
-                        peakTimesHistory.push(currentPeakTime);
-
-                        // 🌟 3. เมื่อเก็บยอดคลื่นครบ 6 ลูก (เท่ากับหายใจครบ 5 Cycle)
-                        if (peakTimesHistory.length === 6) {
-                            
-                            let totalTimeMs = peakTimesHistory[5] - peakTimesHistory[0];
-                            let avgIntervalMs = totalTimeMs / 5;
-                            let displayRR = Math.round(60000 / avgIntervalMs);
-
-                            if (displayRR > 0 && displayRR <= 60) {
-                                document.getElementById('rt-rr').innerText = displayRR;
-                            }
-
-                            // ล้างกระเป๋าเพื่อนับ 5 ลูกใหม่ แต่ยังคงลูกสุดท้ายไว้ตั้งต้น
-                            peakTimesHistory = [currentPeakTime];
-                        }
-                    } 
-                    else if (lastPeakTime === 0) {
-                        peakTimesHistory.push(currentPeakTime);
+            if (bufferDurationMs >= 3000) {
+                
+                // ทำกราฟให้เรียบ (Smoothing)
+                let sm = [];
+                for(let i=0; i<liveRrBuffer.length; i++) {
+                    let sum = 0, count = 0;
+                    for(let j=Math.max(0, i-2); j<=Math.min(liveRrBuffer.length-1, i+2); j++) {
+                        sum += liveRrBuffer[j].m; 
+                        count++;
                     }
+                    sm.push({ t: liveRrBuffer[i].t, m: sum / count });
+                }
+
+                // ดึงค่าสูงสุด ต่ำสุด ในช่วง 15 วินาที
+                let smVals = sm.map(v => v.m);
+                let maxAmp = Math.max(...smVals);
+                let minAmp = Math.min(...smVals);
+                let amplitude = maxAmp - minAmp;
+
+                // 🌟 แก้บัค 0 ค้าง และ บัคสแปมเลข 32:
+                // ตั้งคลื่นตาย (Flatline) ไว้ที่ 40 ถ้าคลื่นสวิงแคบกว่านี้ ถือว่าเป็นแค่สัญญาณรบกวน (Noise)
+                if (amplitude < 40) {
+                    document.getElementById('rt-rr').innerText = "0"; 
+                    peakTimesHistory = []; 
+                    lastPeakTime = 0; 
+                } else {
+                    // สร้างเส้นตัดรับรู้ยอดคลื่น ที่ 40% ของความสูงคลื่นปัจจุบัน
+                    let dynamicThreshold = minAmp + (amplitude * 0.40); 
                     
-                    lastPeakTime = currentPeakTime; 
+                    let checkIdx = sm.length - 2;
+                    if(checkIdx > 0) {
+                        let curr = sm[checkIdx];
+                        let prev = sm[checkIdx - 1];
+                        let next = sm[checkIdx + 1];
+
+                        let isPeak = (curr.m > prev.m) && (curr.m >= next.m);
+                        let isAboveThreshold = curr.m > dynamicThreshold;
+
+                        if (isPeak && isAboveThreshold) {
+                            let currentPeakTime = curr.t;
+                            let intervalMs = currentPeakTime - lastPeakTime;
+
+                            // 🌟 หายใจแต่ละครั้งต้องห่างกันอย่างน้อย 1.2 วินาที (ป้องกันการจับ Noise รัวๆ)
+                            if (lastPeakTime > 0 && intervalMs >= 1200) {
+                                
+                                peakTimesHistory.push(currentPeakTime);
+                                
+                                // เก็บให้ครบ 6 ยอดคลื่น (เท่ากับ 5 ช่วงการหายใจ)
+                                if (peakTimesHistory.length === 6) {
+                                    
+                                    let totalTimeMs = peakTimesHistory[5] - peakTimesHistory[0];
+                                    let avgIntervalMs = totalTimeMs / 5;
+                                    let displayRR = Math.round(60000 / avgIntervalMs);
+
+                                    if (displayRR > 0 && displayRR <= 60) {
+                                        document.getElementById('rt-rr').innerText = displayRR;
+                                    }
+
+                                    peakTimesHistory = [currentPeakTime]; // ล้างเพื่อนับชุดใหม่
+                                }
+                            } 
+                            else if (lastPeakTime === 0) {
+                                peakTimesHistory.push(currentPeakTime);
+                            }
+                            
+                            // อัปเดตยอดคลื่นล่าสุดเฉพาะตอนที่เป็น 0 หรือผ่านเกณฑ์เวลา
+                            if (lastPeakTime === 0 || intervalMs >= 1200) {
+                                lastPeakTime = currentPeakTime; 
+                            }
+                        }
+                    }
                 }
             }
 
