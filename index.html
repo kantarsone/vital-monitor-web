@@ -817,79 +817,97 @@
             const newestT = liveRrBuffer[liveRrBuffer.length - 1].t;
             
             liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
-            const bufferDurationMs = newestT - liveRrBuffer[0].t;
+            
+            // --- 1. เช็คกราฟนิ่งจากข้อมูล 6 วินาทีล่าสุดเท่านั้น (ตัดปัญหาเน็ตหรือคลื่นเก่ากวน) ---
+            let recentBuffer = liveRrBuffer.filter(d => newestT - d.t <= 6000);
+            let isFlat = false;
+            if(recentBuffer.length >= 10) {
+                let rMax = Math.max(...recentBuffer.map(v => v.m));
+                let rMin = Math.min(...recentBuffer.map(v => v.m));
+                if ((rMax - rMin) < 50) {
+                    isFlat = true;
+                }
+            }
 
-            // --- จุดที่ 1: แก้เป็น newestT และรอ 12 วิ ---
+            if (isFlat) {
+                document.getElementById('rt-rr').innerText = "0"; 
+                peakTimesHistory = []; 
+                lastPeakTime = 0; 
+            } else {
+                const bufferDurationMs = newestT - liveRrBuffer[0].t;
+                if (bufferDurationMs >= 3000) {
+                    let sm = [];
+                    for(let i=0; i<liveRrBuffer.length; i++) {
+                        let sum = 0, count = 0;
+                        for(let j=Math.max(0, i-2); j<=Math.min(liveRrBuffer.length-1, i+2); j++) {
+                            sum += liveRrBuffer[j].m; 
+                            count++;
+                        }
+                        sm.push({ t: liveRrBuffer[i].t, m: sum / count });
+                    }
+
+                    // สร้าง Threshold จาก 10 วินาทีล่าสุด เพื่อให้แม่นยำขึ้น
+                    let recentSm = sm.filter(d => newestT - d.t <= 10000);
+                    if (recentSm.length > 0) {
+                        let smVals = recentSm.map(v => v.m);
+                        let maxAmp = Math.max(...smVals);
+                        let minAmp = Math.min(...smVals);
+                        let amplitude = maxAmp - minAmp;
+
+                        if (amplitude >= 50) {
+                            let dynamicThreshold = minAmp + (amplitude * 0.4); 
+                            
+                            let checkIdx = sm.length - 2;
+                            if(checkIdx > 0) {
+                                let curr = sm[checkIdx];
+                                let prev = sm[checkIdx - 1];
+                                let next = sm[checkIdx + 1];
+
+                                let isPeak = (curr.m > prev.m) && (curr.m > next.m);
+                                let isAboveThreshold = curr.m > dynamicThreshold;
+
+                                if (isPeak && isAboveThreshold) {
+                                    let currentPeakTime = curr.t;
+                                    let intervalMs = currentPeakTime - lastPeakTime;
+
+                                    if (lastPeakTime > 0 && intervalMs >= 1200) { // หายใจเร็วสุด 50 ครั้ง/นาที
+                                        peakTimesHistory.push(currentPeakTime);
+                                        
+                                        // --- 2. อัปเดตค่าทุกครั้งที่หายใจ (ใช้ 3 ช่วงคลื่นพอ ไม่ต้องรอ 5) ---
+                                        if (peakTimesHistory.length >= 3) {
+                                            if (peakTimesHistory.length > 4) {
+                                                peakTimesHistory.shift(); // เก็บแค่ 4 ยอดล่าสุด (3 ช่วง)
+                                            }
+                                            
+                                            let totalTimeMs = peakTimesHistory[peakTimesHistory.length - 1] - peakTimesHistory[0];
+                                            let numIntervals = peakTimesHistory.length - 1;
+                                            let avgIntervalMs = totalTimeMs / numIntervals;
+                                            let displayRR = Math.round(60000 / avgIntervalMs);
+
+                                            if (displayRR > 0 && displayRR <= 60) {
+                                                document.getElementById('rt-rr').innerText = displayRR;
+                                            }
+                                        }
+                                    } 
+                                    else if (lastPeakTime === 0) {
+                                        peakTimesHistory.push(currentPeakTime);
+                                    }
+                                    
+                                    if (lastPeakTime === 0 || intervalMs >= 1200) {
+                                        lastPeakTime = currentPeakTime; 
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // หมดเวลา 12 วิ ไม่มีการหายใจเลย ตัดเป็น 0
             if(newestT - lastPeakTime > 12000 && lastPeakTime > 0) {
                 document.getElementById('rt-rr').innerText = "0";
                 peakTimesHistory = []; 
                 lastPeakTime = 0; 
-            }
-
-            if (bufferDurationMs >= 3000) {
-                
-                let sm = [];
-                for(let i=0; i<liveRrBuffer.length; i++) {
-                    let sum = 0, count = 0;
-                    for(let j=Math.max(0, i-2); j<=Math.min(liveRrBuffer.length-1, i+2); j++) {
-                        sum += liveRrBuffer[j].m; 
-                        count++;
-                    }
-                    sm.push({ t: liveRrBuffer[i].t, m: sum / count });
-                }
-
-                let smVals = sm.map(v => v.m);
-                let maxAmp = Math.max(...smVals);
-                let minAmp = Math.min(...smVals);
-                let amplitude = maxAmp - minAmp;
-
-                // --- จุดที่ 2: ตั้งค่ากัน Noise เพิ่มเป็น 50 ---
-                if (amplitude < 50) {
-                    document.getElementById('rt-rr').innerText = "0"; 
-                    peakTimesHistory = []; 
-                    lastPeakTime = 0; 
-                } else {
-                    let dynamicThreshold = minAmp + (amplitude * 0.35); 
-                    
-                    let checkIdx = sm.length - 2;
-                    if(checkIdx > 0) {
-                        let curr = sm[checkIdx];
-                        let prev = sm[checkIdx - 1];
-                        let next = sm[checkIdx + 1];
-
-                        let isPeak = (curr.m > prev.m) && (curr.m >= next.m);
-                        let isAboveThreshold = curr.m > dynamicThreshold;
-
-                        if (isPeak && isAboveThreshold) {
-                            let currentPeakTime = curr.t;
-                            let intervalMs = currentPeakTime - lastPeakTime;
-
-                            if (lastPeakTime > 0 && intervalMs >= 1000) {
-                                
-                                peakTimesHistory.push(currentPeakTime);
-                                
-                                if (peakTimesHistory.length === 6) {
-                                    
-                                    let totalTimeMs = peakTimesHistory[5] - peakTimesHistory[0];
-                                    
-                                    let avgIntervalMs = totalTimeMs / 5;
-                                    let displayRR = Math.round(60000 / avgIntervalMs);
-
-                                    if (displayRR > 0 && displayRR <= 60) {
-                                        document.getElementById('rt-rr').innerText = displayRR;
-                                    }
-
-                                    peakTimesHistory = [currentPeakTime];
-                                }
-                            } 
-                            else if (lastPeakTime === 0) {
-                                peakTimesHistory.push(currentPeakTime);
-                            }
-                            
-                            lastPeakTime = currentPeakTime; 
-                        }
-                    }
-                }
             }
 
             if (p.m !== lastMValue) {
