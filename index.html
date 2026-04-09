@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        /* (CSS เหมือนเดิมทุกประการ ไม่มีการเปลี่ยนแปลง) */
         :root { --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; --border: #d1d5db; --primary: #3b82f6; --green: #10b981; --red: #f43f5e; --status-bg: #e5e7eb; --orange: #fb8c00; --gray: #6b7280; --dark-blue: #1e3a8a; }
         body.dark { --bg: #020617; --card: #0f172a; --text: #f8fafc; --border: #1e293b; --status-bg: #1e293b; }
         body { font-family: 'Inter', 'Sarabun', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; transition: 0.3s; justify-content: center; }
@@ -318,6 +319,7 @@
     </div>
 
 <script>
+    // (ข้อมูลการเชื่อมต่อ Supabase คงเดิม)
     const S_URL = "https://qeckiglbicuajldrmuco.supabase.co";
     const S_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlY2tpZ2xiaWN1YWpsZHJtdWNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTA5NjIsImV4cCI6MjA4MTM4Njk2Mn0.XK9jd31gGtt7jYWotIwd5LQAhqM7QBFnZs1izlZMFp0";
     let isLoginMode = true, liveChart, historyChart, currentUser = null;
@@ -816,18 +818,19 @@
             document.getElementById('rt-hv').innerText = p.bpm || "--";
             document.getElementById('rt-sv').innerText = p.spo2 || "--";
 
-            // --- 🌟 อัลกอริทึม Peak-to-Peak Interval ที่ปรับปรุงใหม่ ---
+            // --- 🌟 อัลกอริทึม Peak-to-Peak Interval ที่ปรับปรุงใหม่ (เฉลี่ย 10 ลูกคลื่น) ---
             liveRrBuffer.push({ t: p.t, m: p.m });
             const newestT = liveRrBuffer[liveRrBuffer.length - 1].t;
             
-            // เก็บข้อมูลดิบไว้แค่ 10 วินาทีพอ เพื่อไม่ให้หนักเครื่อง
-            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 10000);
+            // เก็บข้อมูลดิบไว้แค่ 15 วินาที (ขยายเวลาขึ้นนิดหน่อยเพื่อให้เก็บ 10 ลูกคลื่นได้ครบ)
+            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 15000);
             const bufferDurationMs = newestT - liveRrBuffer[0].t;
 
             // รีเซ็ตค่าเป็น 0 ถ้าสัญญาณขาดหายไปนานกว่า 8 วินาที
             if(now - lastPeakTime > 8000 && lastPeakTime > 0) {
                 document.getElementById('rt-rr').innerText = "0";
                 rrHistory = []; 
+                lastPeakTime = 0; // เพิ่มบรรทัดนี้เพื่อเคลียร์เวลายอดคลื่น
             }
 
             // ถ้ามีข้อมูลพอสมควรแล้ว เริ่มคำนวณ!
@@ -853,8 +856,8 @@
                 // 🌟 บัคฟิกซ์: เพิ่มเกณฑ์ตัดคลื่นตาย (Flatline Threshold)
                 // สเกล 0-4095 ถ้าน้อยกว่า 80 ถือว่าเป็นแค่ Noise เซ็นเซอร์ ไม่ใช่ลมหายใจ
                 if (amplitude < 80) {
-                    document.getElementById('rt-rr').innerText = "0"; // บังคับโชว์ 0
-                    rrHistory = [];   // ล้างประวัติการคำนวณเก่าทิ้ง
+                    document.getElementById('rt-rr').innerText = "0"; // บังคับโชว์ 0 ทันที
+                    rrHistory = [];   // ล้างประวัติการคำนวณทิ้ง ป้องกันค่าดีด
                     lastPeakTime = 0; // รีเซ็ตเวลาเริ่มต้นนับใหม่
                 } else {
                     let dynamicThreshold = minAmp + (amplitude * 0.35); // ยอดต้องสูงกว่าฐาน 35%
@@ -882,13 +885,13 @@
                                 // กรองค่าที่ผิดปกติ (คนปกติหายใจไม่เกิน 60 ครั้ง/นาที)
                                 if (instantRR > 0 && instantRR <= 60) {
                                     
-                                    // เก็บประวัติแค่ 3 ลูกล่าสุด
+                                    // 🌟 เปลี่ยนเป็นเก็บประวัติ 10 ลูกล่าสุด
                                     rrHistory.push(instantRR);
-                                    if (rrHistory.length > 3) {
+                                    if (rrHistory.length > 10) {
                                         rrHistory.shift(); 
                                     }
 
-                                    // เฉลี่ย 3 ลูกล่าสุดเพื่อให้นิ่งขึ้น แล้วโชว์เลย!
+                                    // 🌟 เฉลี่ย 10 ลูกล่าสุดเพื่อให้นิ่งสุดๆ!
                                     let sumRR = 0;
                                     for(let i=0; i<rrHistory.length; i++) sumRR += rrHistory[i];
                                     let displayRR = Math.round(sumRR / rrHistory.length);
