@@ -819,7 +819,8 @@
             liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
             const bufferDurationMs = newestT - liveRrBuffer[0].t;
 
-            if(now - lastPeakTime > 15000 && lastPeakTime > 0) {
+            // แก้ไขจุดที่ 1: ลดเวลารอจาก 15 วิ (15000) เป็น 6 วิ (6000)
+            if(now - lastPeakTime > 6000 && lastPeakTime > 0) {
                 document.getElementById('rt-rr').innerText = "0";
                 peakTimesHistory = []; 
                 lastPeakTime = 0; 
@@ -842,7 +843,8 @@
                 let minAmp = Math.min(...smVals);
                 let amplitude = maxAmp - minAmp;
 
-                if (amplitude < 20) {
+                // แก้ไขจุดที่ 2: ปรับความไวการเช็คกราฟนิ่งจาก 20 เป็น 40
+                if (amplitude < 40) {
                     document.getElementById('rt-rr').innerText = "0"; 
                     peakTimesHistory = []; 
                     lastPeakTime = 0; 
