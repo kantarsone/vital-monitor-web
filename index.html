@@ -331,8 +331,6 @@
     let lastMValue = -1;
 
     let liveRrBuffer = [];
-    
-    // 🌟 เปลี่ยนตัวแปรให้เป็นแบบเก็บเวลา 11 จุด (เพื่อให้ได้ระยะห่าง 10 คลื่น)
     let lastPeakTime = 0;      
     let peakTimesHistory = []; 
 
@@ -708,7 +706,7 @@
             dataBuffer = []; 
             liveRrBuffer = []; 
             lastPeakTime = 0;      
-            peakTimesHistory = []; // รีเซ็ตตัวแปรใหม่
+            peakTimesHistory = []; 
             document.getElementById('rt-rr').innerText = "--"; 
             
             isFirstFetch = true; 
@@ -815,16 +813,13 @@
             document.getElementById('rt-hv').innerText = p.bpm || "--";
             document.getElementById('rt-sv').innerText = p.spo2 || "--";
 
-            // 🌟 เก็บคลื่นเข้า Buffer
             liveRrBuffer.push({ t: p.t, m: p.m });
             const newestT = liveRrBuffer[liveRrBuffer.length - 1].t;
             
-            // 🌟 ให้ความจำยาวขึ้น 15 วินาที เพื่อให้ครอบคลุมเวลา 10 คลื่นลมหายใจพอ
-            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 15000);
+            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
             const bufferDurationMs = newestT - liveRrBuffer[0].t;
 
-            // รีเซ็ตค่าเป็น 0 ถ้าสัญญาณขาดหายไปนานกว่า 8 วินาที
-            if(now - lastPeakTime > 8000 && lastPeakTime > 0) {
+            if(now - lastPeakTime > 15000 && lastPeakTime > 0) {
                 document.getElementById('rt-rr').innerText = "0";
                 peakTimesHistory = []; 
                 lastPeakTime = 0; 
@@ -832,7 +827,6 @@
 
             if (bufferDurationMs >= 3000) {
                 
-                // 1. ทำ Smoothing
                 let sm = [];
                 for(let i=0; i<liveRrBuffer.length; i++) {
                     let sum = 0, count = 0;
@@ -843,17 +837,15 @@
                     sm.push({ t: liveRrBuffer[i].t, m: sum / count });
                 }
 
-                // 2. คำนวณ Dynamic Threshold
                 let smVals = sm.map(v => v.m);
                 let maxAmp = Math.max(...smVals);
                 let minAmp = Math.min(...smVals);
                 let amplitude = maxAmp - minAmp;
 
-                // 🌟 ตัดคลื่นตาย: ถ้านิ่งเกินไป ให้เคลียร์ประวัติทิ้งให้หมดแล้วโชว์ 0
-                if (amplitude < 80) {
+                if (amplitude < 20) {
                     document.getElementById('rt-rr').innerText = "0"; 
-                    peakTimesHistory = []; // ล้างประวัติเวลาทิ้ง ป้องกันค่าดีด
-                    lastPeakTime = 0;      // รีเซ็ตการจับยอดใหม่
+                    peakTimesHistory = []; 
+                    lastPeakTime = 0; 
                 } else {
                     let dynamicThreshold = minAmp + (amplitude * 0.35); 
                     
@@ -870,37 +862,29 @@
                             let currentPeakTime = curr.t;
                             let intervalMs = currentPeakTime - lastPeakTime;
 
-                            // เช็คว่าห่างจากยอดที่แล้วอย่างน้อย 1 วิ (กัน Noise)
                             if (lastPeakTime > 0 && intervalMs >= 1000) {
                                 
-                                // 🌟 1. เก็บ "เวลา" ของยอดคลื่นปัจจุบันลง Array
                                 peakTimesHistory.push(currentPeakTime);
                                 
-                                // 🌟 2. เก็บประวัติไว้ 11 ยอดล่าสุด (11 ยอด = หายใจ 10 ช่วง พอดีเป๊ะ)
-                                if (peakTimesHistory.length > 11) {
-                                    peakTimesHistory.shift(); 
-                                }
-
-                                // 🌟 3. คำนวณ RR จาก "เวลารวม" ของ 10 ช่วงล่าสุด
-                                let numIntervals = peakTimesHistory.length - 1;
-                                if (numIntervals > 0) {
-                                    let totalTimeMs = peakTimesHistory[numIntervals] - peakTimesHistory[0];
+                                if (peakTimesHistory.length === 6) {
                                     
-                                    let avgIntervalMs = totalTimeMs / numIntervals;
+                                    let totalTimeMs = peakTimesHistory[5] - peakTimesHistory[0];
+                                    
+                                    let avgIntervalMs = totalTimeMs / 5;
                                     let displayRR = Math.round(60000 / avgIntervalMs);
 
-                                    // กรองค่าขยะ: ถ้าคำนวณแล้วได้เลขเวอร์ๆ จะไม่เอาขึ้นจอ
                                     if (displayRR > 0 && displayRR <= 60) {
                                         document.getElementById('rt-rr').innerText = displayRR;
                                     }
+
+                                    peakTimesHistory = [currentPeakTime];
                                 }
                             } 
-                            // ถ้ายอดแรกสุด ให้จดเวลาไว้เฉยๆ ก่อน
                             else if (lastPeakTime === 0) {
                                 peakTimesHistory.push(currentPeakTime);
                             }
                             
-                            lastPeakTime = currentPeakTime; // จดเวลายอดคลื่นล่าสุดไว้
+                            lastPeakTime = currentPeakTime; 
                         }
                     }
                 }
