@@ -819,7 +819,8 @@
             liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
             const bufferDurationMs = newestT - liveRrBuffer[0].t;
 
-            if(now - lastPeakTime > 15000 && lastPeakTime > 0) {
+            // --- จุดที่ 1: แก้เป็น newestT และรอ 12 วิ ---
+            if(newestT - lastPeakTime > 12000 && lastPeakTime > 0) {
                 document.getElementById('rt-rr').innerText = "0";
                 peakTimesHistory = []; 
                 lastPeakTime = 0; 
@@ -842,7 +843,8 @@
                 let minAmp = Math.min(...smVals);
                 let amplitude = maxAmp - minAmp;
 
-                if (amplitude < 20) {
+                // --- จุดที่ 2: ตั้งค่ากัน Noise เพิ่มเป็น 50 ---
+                if (amplitude < 50) {
                     document.getElementById('rt-rr').innerText = "0"; 
                     peakTimesHistory = []; 
                     lastPeakTime = 0; 
