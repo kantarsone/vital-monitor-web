@@ -819,8 +819,7 @@
             liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
             const bufferDurationMs = newestT - liveRrBuffer[0].t;
 
-            // แก้ไขจุดที่ 1: ปรับเวลารอเป็น 10 วิ (10000)
-            if(now - lastPeakTime > 10000 && lastPeakTime > 0) {
+            if(now - lastPeakTime > 15000 && lastPeakTime > 0) {
                 document.getElementById('rt-rr').innerText = "0";
                 peakTimesHistory = []; 
                 lastPeakTime = 0; 
@@ -843,8 +842,7 @@
                 let minAmp = Math.min(...smVals);
                 let amplitude = maxAmp - minAmp;
 
-                // แก้ไขจุดที่ 2: ปรับเกณฑ์กราฟนิ่งลงเหลือ 25 เพื่อให้จับการหายใจตื้นได้
-                if (amplitude < 25) {
+                if (amplitude < 20) {
                     document.getElementById('rt-rr').innerText = "0"; 
                     peakTimesHistory = []; 
                     lastPeakTime = 0; 
