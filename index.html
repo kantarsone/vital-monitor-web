@@ -713,7 +713,7 @@
             lastSuccessfulFetchTime = 0; 
             lastF = 0; lastV = 0; lastMValue = -1; 
             
-            if(!fetchInterval) fetchInterval = setInterval(fetchRealtimeData, 500); 
+            if(!fetchInterval) fetchInterval = setInterval(fetchRealtimeData, 300); 
             if(!renderInterval) renderInterval = setInterval(processBufferAndLights, 80); 
         } else { 
             clearInterval(fetchInterval); fetchInterval = null; 
@@ -818,13 +818,12 @@
             
             liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
             
-            // --- 1. เช็คกราฟนิ่งจากข้อมูล 6 วินาทีล่าสุดเท่านั้น (ตัดปัญหาเน็ตหรือคลื่นเก่ากวน) ---
-            let recentBuffer = liveRrBuffer.filter(d => newestT - d.t <= 6000);
+            let recentBuffer = liveRrBuffer.filter(d => newestT - d.t <= 8000);
             let isFlat = false;
             if(recentBuffer.length >= 10) {
                 let rMax = Math.max(...recentBuffer.map(v => v.m));
                 let rMin = Math.min(...recentBuffer.map(v => v.m));
-                if ((rMax - rMin) < 50) {
+                if ((rMax - rMin) < 30) { 
                     isFlat = true;
                 }
             }
@@ -846,7 +845,6 @@
                         sm.push({ t: liveRrBuffer[i].t, m: sum / count });
                     }
 
-                    // สร้าง Threshold จาก 10 วินาทีล่าสุด เพื่อให้แม่นยำขึ้น
                     let recentSm = sm.filter(d => newestT - d.t <= 10000);
                     if (recentSm.length > 0) {
                         let smVals = recentSm.map(v => v.m);
@@ -854,8 +852,8 @@
                         let minAmp = Math.min(...smVals);
                         let amplitude = maxAmp - minAmp;
 
-                        if (amplitude >= 50) {
-                            let dynamicThreshold = minAmp + (amplitude * 0.4); 
+                        if (amplitude >= 30) {
+                            let dynamicThreshold = minAmp + (amplitude * 0.3); 
                             
                             let checkIdx = sm.length - 2;
                             if(checkIdx > 0) {
@@ -870,13 +868,12 @@
                                     let currentPeakTime = curr.t;
                                     let intervalMs = currentPeakTime - lastPeakTime;
 
-                                    if (lastPeakTime > 0 && intervalMs >= 1200) { // หายใจเร็วสุด 50 ครั้ง/นาที
+                                    if (lastPeakTime > 0 && intervalMs >= 1000) { 
                                         peakTimesHistory.push(currentPeakTime);
                                         
-                                        // --- 2. อัปเดตค่าทุกครั้งที่หายใจ (ใช้ 3 ช่วงคลื่นพอ ไม่ต้องรอ 5) ---
                                         if (peakTimesHistory.length >= 3) {
                                             if (peakTimesHistory.length > 4) {
-                                                peakTimesHistory.shift(); // เก็บแค่ 4 ยอดล่าสุด (3 ช่วง)
+                                                peakTimesHistory.shift(); 
                                             }
                                             
                                             let totalTimeMs = peakTimesHistory[peakTimesHistory.length - 1] - peakTimesHistory[0];
@@ -893,7 +890,7 @@
                                         peakTimesHistory.push(currentPeakTime);
                                     }
                                     
-                                    if (lastPeakTime === 0 || intervalMs >= 1200) {
+                                    if (lastPeakTime === 0 || intervalMs >= 1000) {
                                         lastPeakTime = currentPeakTime; 
                                     }
                                 }
@@ -903,8 +900,7 @@
                 }
             }
 
-            // หมดเวลา 12 วิ ไม่มีการหายใจเลย ตัดเป็น 0
-            if(newestT - lastPeakTime > 12000 && lastPeakTime > 0) {
+            if(newestT - lastPeakTime > 15000 && lastPeakTime > 0) {
                 document.getElementById('rt-rr').innerText = "0";
                 peakTimesHistory = []; 
                 lastPeakTime = 0; 
