@@ -974,7 +974,8 @@
                     document.getElementById('pdf-btn').classList.remove('hidden');
                 }
 
-                let groupMs = 1000; 
+                // 🌟 1. เพิ่มความละเอียดจาก 1 วินาที เป็น 0.5 วินาทีต่อจุด 
+                let groupMs = 500; 
 
                 let aggregatedData = [];
                 let currentGroup = Math.floor(data[0].t / groupMs) * groupMs;
@@ -1013,7 +1014,8 @@
                 const avgBpm = validBpms.length > 0 ? Math.round(validBpms.reduce((a, b) => a + b, 0) / validBpms.length) : "--";
                 const avgSpo2 = validSpo2s.length > 0 ? Math.round(validSpo2s.reduce((a, b) => a + b, 0) / validSpo2s.length) : "--";
                 
-                let windowSize = 5;
+                // 🌟 2. ลดการเกลี่ยคลื่นลง (ป้องกันคลื่นตื้นๆ โดนเกลี่ยจนหาย)
+                let windowSize = 3; 
                 let smoothedVals = [];
                 for(let i = 0; i < vals.length; i++) {
                     let start = Math.max(0, i - Math.floor(windowSize/2));
@@ -1026,7 +1028,7 @@
                     smoothedVals.push(sum / count);
                 }
 
-                let baseWindowSize = 15; 
+                let baseWindowSize = 20; 
                 let baselineVals = [];
                 for(let i = 0; i < smoothedVals.length; i++) {
                     let start = Math.max(0, i - Math.floor(baseWindowSize/2));
@@ -1040,8 +1042,8 @@
                 }
 
                 let breaths = 0;
-                // 🌟 ปรับระยะห่างเป็น 1 วินาที (ยอมให้หายใจติดกันได้เร็วขึ้น)
-                let minDistance = 1; 
+                // 🌟 3. ระยะห่าง 2 จุด = 1 วินาที (ยอมให้หายใจติดกันได้เร็วสุด 60 ครั้ง/นาที)
+                let minDistance = 2; 
                 let historyLastPeakIdx = -minDistance;
 
                 for (let i = 1; i < smoothedVals.length - 1; i++) {
@@ -1060,14 +1062,14 @@
                     }
                     let amplitude = localMax - localMin;
 
-                    // 🌟 ปรับ Threshold ให้จับง่ายขึ้น (ยอดคลื่นโผล่มาแค่ 10% ก็นับแล้ว)
-                    let dynamicThreshold = baseline + (amplitude * 0.1);
+                    // 🌟 4. ยอดคลื่นโผล่พ้นฐานแค่ 5% ก็จับหมด
+                    let dynamicThreshold = baseline + (amplitude * 0.05);
 
                     let isPeak = (curr > prev) && (curr >= next);
                     let isAboveThreshold = curr > dynamicThreshold;
 
-                    // 🌟 ลดเกณฑ์ความกว้างคลื่นเหลือแค่ 10 กราฟขยับนิดเดียวก็นับให้เลย
-                    if (isPeak && isAboveThreshold && amplitude > 10) {
+                    // 🌟 5. ลดเกณฑ์ความกว้างคลื่นเหลือแค่ 5 (กราฟขยับนิดเดียวก็เป็นยอดแล้ว)
+                    if (isPeak && isAboveThreshold && amplitude > 5) {
                         if ((i - historyLastPeakIdx) >= minDistance) {
                             breaths++;
                             historyLastPeakIdx = i; 
@@ -1099,7 +1101,8 @@
                 const innerContainer = document.getElementById('history-inner-container');
                 const scrollContainer = document.getElementById('history-scroll-container');
                 
-                let calculatedWidth = aggregatedData.length * 40; 
+                // ขยายกราฟออกไปอีก เพราะข้อมูลถี่ขึ้น 2 เท่า กราฟจะได้ไม่ดูอัดแน่นเกินไป
+                let calculatedWidth = aggregatedData.length * 20; 
                 
                 if (calculatedWidth > scrollContainer.clientWidth - 40) {
                     innerContainer.style.width = calculatedWidth + 'px';
