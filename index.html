@@ -1042,37 +1042,49 @@
                 }
 
                 let breaths = 0;
-                // 🌟 3. ระยะห่าง 2 จุด = 1 วินาที (ยอมให้หายใจติดกันได้เร็วสุด 60 ครั้ง/นาที)
-                let minDistance = 2; 
-                let historyLastPeakIdx = -minDistance;
+                // 🌟 3. ด่านแรก: กรอง Noise ที่เกิดตอนไม่หายใจ (เส้นตรง) ขยับไม่ถึง 25 หน่วย ไม่นับ!
+                let isFlatline = true;
+                let globalMax = Math.max(...smoothedVals);
+                let globalMin = Math.min(...smoothedVals);
+                if (globalMax - globalMin > 25) {
+                    isFlatline = false; // มีการหายใจจริงๆ
+                }
 
-                for (let i = 1; i < smoothedVals.length - 1; i++) {
-                    let curr = smoothedVals[i];
-                    let prev = smoothedVals[i - 1];
-                    let next = smoothedVals[i + 1];
-                    let baseline = baselineVals[i];
+                if (!isFlatline) {
+                    // ระยะห่าง 2 จุด = 1 วินาที (ยอมให้หายใจติดกันได้เร็วสุด 60 ครั้ง/นาที)
+                    let minDistance = 2; 
+                    let historyLastPeakIdx = -minDistance;
 
-                    let localStart = Math.max(0, i - 10);
-                    let localEnd = Math.min(smoothedVals.length - 1, i + 10);
-                    let localMax = -Infinity;
-                    let localMin = Infinity;
-                    for(let j = localStart; j <= localEnd; j++) {
-                        if(smoothedVals[j] > localMax) localMax = smoothedVals[j];
-                        if(smoothedVals[j] < localMin) localMin = smoothedVals[j];
-                    }
-                    let amplitude = localMax - localMin;
+                    for (let i = 1; i < smoothedVals.length - 1; i++) {
+                        let curr = smoothedVals[i];
+                        let prev = smoothedVals[i - 1];
+                        let next = smoothedVals[i + 1];
+                        let baseline = baselineVals[i];
 
-                    // 🌟 4. ยอดคลื่นโผล่พ้นฐานแค่ 5% ก็จับหมด
-                    let dynamicThreshold = baseline + (amplitude * 0.05);
+                        let localStart = Math.max(0, i - 10);
+                        let localEnd = Math.min(smoothedVals.length - 1, i + 10);
+                        let localMax = -Infinity;
+                        let localMin = Infinity;
+                        for(let j = localStart; j <= localEnd; j++) {
+                            if(smoothedVals[j] > localMax) localMax = smoothedVals[j];
+                            if(smoothedVals[j] < localMin) localMin = smoothedVals[j];
+                        }
+                        let amplitude = localMax - localMin;
 
-                    let isPeak = (curr > prev) && (curr >= next);
-                    let isAboveThreshold = curr > dynamicThreshold;
+                        // 🌟 4. ถ้าคลื่นจุดนั้นแคบมาก (ต่ำกว่า 25) ข้ามไปเลย ไม่ใช่คลื่นหายใจ
+                        if (amplitude < 25) continue;
 
-                    // 🌟 5. ลดเกณฑ์ความกว้างคลื่นเหลือแค่ 5 (กราฟขยับนิดเดียวก็เป็นยอดแล้ว)
-                    if (isPeak && isAboveThreshold && amplitude > 5) {
-                        if ((i - historyLastPeakIdx) >= minDistance) {
-                            breaths++;
-                            historyLastPeakIdx = i; 
+                        // 🌟 5. ยอดคลื่นโผล่พ้นฐานแค่ 15% 
+                        let dynamicThreshold = baseline + (amplitude * 0.15);
+
+                        let isPeak = (curr > prev) && (curr >= next);
+                        let isAboveThreshold = curr > dynamicThreshold;
+
+                        if (isPeak && isAboveThreshold) {
+                            if ((i - historyLastPeakIdx) >= minDistance) {
+                                breaths++;
+                                historyLastPeakIdx = i; 
+                            }
                         }
                     }
                 }
