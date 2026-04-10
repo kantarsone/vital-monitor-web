@@ -331,8 +331,6 @@
     let lastMValue = -1;
 
     let liveRrBuffer = [];
-    let lastPeakTime = 0;      
-    let peakTimesHistory = []; 
 
     function toggleAuth() {
         isLoginMode = !isLoginMode;
@@ -676,7 +674,17 @@
     }
 
     function initCharts() {
-        const optLive = { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { min: 0, max: 4095, title: { display: true, text: 'ADC (12-bit)' }, ticks: { callback: (v) => v.toString().replace(/,/g, '') } }, x: { title: { display: true, text: 'Time' }, ticks: { autoSkip: true, maxTicksLimit: 15 } } }, elements: { line: { tension: 0.4 } } };
+        // 🌟 1. ขยายกราฟสดเป็น 300 จุด (โชว์เต็ม 15 วินาที) และปรับแกน X ให้แสดงวินาที
+        const optLive = { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            animation: false, 
+            scales: { 
+                y: { min: 0, max: 4095, title: { display: true, text: 'ADC (12-bit)' }, ticks: { callback: (v) => v.toString().replace(/,/g, '') } }, 
+                x: { title: { display: true, text: 'Time (วินาที)' }, ticks: { autoSkip: true, maxTicksLimit: 15 } } 
+            }, 
+            elements: { line: { tension: 0.4 } } 
+        };
         const optHis = { 
             responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { right: 25, left: 10, top: 10, bottom: 10 } }, 
             scales: { y: { min: 0, max: 4095, title: { display: true, text: 'ADC (12-bit)' }, ticks: { callback: (v) => v.toString().replace(/,/g, '') } }, x: { title: { display: true, text: 'Time' }, ticks: { autoSkip: true, maxTicksLimit: 20, maxRotation: 0, minRotation: 0 } } }, 
@@ -686,7 +694,7 @@
         if(liveChart) liveChart.destroy();
         if(historyChart) historyChart.destroy();
         
-        liveChart = new Chart(document.getElementById('liveChart'), { type: 'line', data: { labels: Array(100).fill(''), datasets: [{ label: 'Live Wave', data: Array(100).fill(2048), borderColor: '#10b981', borderWidth: 2.5, pointRadius: 0, fill: false }] }, options: optLive });
+        liveChart = new Chart(document.getElementById('liveChart'), { type: 'line', data: { labels: Array(300).fill(''), datasets: [{ label: 'Live Wave', data: Array(300).fill(2048), borderColor: '#10b981', borderWidth: 2.5, pointRadius: 0, fill: false }] }, options: optLive });
         historyChart = new Chart(document.getElementById('historyChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'History Wave', data: [], borderColor: '#3b82f6', fill: true, pointRadius: 0, tension: 0.4 }] }, options: optHis });
         
         dataBuffer = []; 
@@ -705,8 +713,6 @@
         if(tab === 'rt') { 
             dataBuffer = []; 
             liveRrBuffer = []; 
-            lastPeakTime = 0;      
-            peakTimesHistory = []; 
             document.getElementById('rt-rr').innerText = "--"; 
             
             isFirstFetch = true; 
@@ -755,7 +761,8 @@
 
     async function fetchRealtimeData() {
         try {
-            const res = await fetch(`${S_URL}/rest/v1/breath_readings?select=*&patient_id=eq.${viewingUser.id}&order=t.desc&limit=30`, { 
+            // 🌟 2. ดึงข้อมูล 300 ตัว เพื่อให้พอกดเข้าหน้า Live ปุ๊บ โชว์กราฟ 15 วิ เต็มจอทันที
+            const res = await fetch(`${S_URL}/rest/v1/breath_readings?select=*&patient_id=eq.${viewingUser.id}&order=t.desc&limit=300`, { 
                 headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` }, cache: 'no-store'
             });
             const data = await res.json();
@@ -769,9 +776,10 @@
                     
                     const newest = data[data.length - 1];
                     
-                    data.slice(-30).forEach(p => {
+                    data.slice(-300).forEach(p => {
                         liveChart.data.labels.shift();
-                        liveChart.data.labels.push("");
+                        let dt = new Date(p.t);
+                        liveChart.data.labels.push(dt.getSeconds() + "s");
                         liveChart.data.datasets[0].data.shift();
                         liveChart.data.datasets[0].data.push(p.m);
                     });
@@ -816,94 +824,91 @@
             liveRrBuffer.push({ t: p.t, m: p.m });
             const newestT = liveRrBuffer[liveRrBuffer.length - 1].t;
             
-            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 30000);
+            // 🌟 3. ให้หลอดความจำสดเก็บข้อมูลไว้ 15 วินาที พอดีกับหน้าจอกราฟ
+            liveRrBuffer = liveRrBuffer.filter(d => newestT - d.t <= 15000);
             
-            let recentBuffer = liveRrBuffer.filter(d => newestT - d.t <= 8000);
+            // --- อัลกอริทึมคำนวณ RR สด (ใช้สูตรเป๊ะๆ แบบประวัติย้อนหลัง) ---
             let isFlat = false;
+            let recentBuffer = liveRrBuffer.filter(d => newestT - d.t <= 5000); // เช็คว่า 5 วิหลังสุดนิ่งสนิทไหม
             if(recentBuffer.length >= 10) {
                 let rMax = Math.max(...recentBuffer.map(v => v.m));
                 let rMin = Math.min(...recentBuffer.map(v => v.m));
-                if ((rMax - rMin) < 30) { 
-                    isFlat = true;
-                }
+                if ((rMax - rMin) < 25) isFlat = true; // คลื่นเตี้ยกว่า 25 ตัดเป็นนิ่ง
             }
 
             if (isFlat) {
                 document.getElementById('rt-rr').innerText = "0"; 
-                peakTimesHistory = []; 
-                lastPeakTime = 0; 
             } else {
-                const bufferDurationMs = newestT - liveRrBuffer[0].t;
-                if (bufferDurationMs >= 3000) {
-                    let sm = [];
-                    for(let i=0; i<liveRrBuffer.length; i++) {
-                        let sum = 0, count = 0;
-                        for(let j=Math.max(0, i-2); j<=Math.min(liveRrBuffer.length-1, i+2); j++) {
-                            sum += liveRrBuffer[j].m; 
-                            count++;
-                        }
-                        sm.push({ t: liveRrBuffer[i].t, m: sum / count });
+                let vals = liveRrBuffer.map(d => d.m);
+                let ts = liveRrBuffer.map(d => d.t);
+                
+                let windowSize = 3; 
+                let smoothedVals = [];
+                for(let i = 0; i < vals.length; i++) {
+                    let start = Math.max(0, i - Math.floor(windowSize/2));
+                    let end = Math.min(vals.length - 1, i + Math.floor(windowSize/2));
+                    let sum = 0, count = 0;
+                    for(let j = start; j <= end; j++) { sum += vals[j]; count++; }
+                    smoothedVals.push(sum / count);
+                }
+
+                let baseWindowSize = 15; 
+                let baselineVals = [];
+                for(let i = 0; i < smoothedVals.length; i++) {
+                    let start = Math.max(0, i - Math.floor(baseWindowSize/2));
+                    let end = Math.min(smoothedVals.length - 1, i + Math.floor(baseWindowSize/2));
+                    let sum = 0, count = 0;
+                    for(let j = start; j <= end; j++) { sum += smoothedVals[j]; count++; }
+                    baselineVals.push(sum / count);
+                }
+
+                let newPeaks = [];
+                let minDistanceMs = 1000; // ห่างกันขั้นต่ำ 1 วิ (นับได้สูงสุด 60 ครั้ง/นาที)
+                let lastPeakTime = 0;
+
+                for (let i = 1; i < smoothedVals.length - 1; i++) {
+                    let curr = smoothedVals[i];
+                    let prev = smoothedVals[i - 1];
+                    let next = smoothedVals[i + 1];
+                    let baseline = baselineVals[i];
+                    let cTime = ts[i];
+
+                    let localStart = Math.max(0, i - 10);
+                    let localEnd = Math.min(smoothedVals.length - 1, i + 10);
+                    let localMax = -Infinity;
+                    let localMin = Infinity;
+                    for(let j = localStart; j <= localEnd; j++) {
+                        if(smoothedVals[j] > localMax) localMax = smoothedVals[j];
+                        if(smoothedVals[j] < localMin) localMin = smoothedVals[j];
                     }
+                    let amplitude = localMax - localMin;
 
-                    let recentSm = sm.filter(d => newestT - d.t <= 10000);
-                    if (recentSm.length > 0) {
-                        let smVals = recentSm.map(v => v.m);
-                        let maxAmp = Math.max(...smVals);
-                        let minAmp = Math.min(...smVals);
-                        let amplitude = maxAmp - minAmp;
+                    // ป้องกันการนับ Noise
+                    if (amplitude < 25) continue; 
 
-                        if (amplitude >= 30) {
-                            let dynamicThreshold = minAmp + (amplitude * 0.3); 
-                            
-                            let checkIdx = sm.length - 2;
-                            if(checkIdx > 0) {
-                                let curr = sm[checkIdx];
-                                let prev = sm[checkIdx - 1];
-                                let next = sm[checkIdx + 1];
+                    let dynamicThreshold = baseline + (amplitude * 0.15);
+                    let isPeak = (curr > prev) && (curr >= next);
+                    let isAboveThreshold = curr > dynamicThreshold;
 
-                                let isPeak = (curr.m > prev.m) && (curr.m > next.m);
-                                let isAboveThreshold = curr.m > dynamicThreshold;
-
-                                if (isPeak && isAboveThreshold) {
-                                    let currentPeakTime = curr.t;
-                                    let intervalMs = currentPeakTime - lastPeakTime;
-
-                                    if (lastPeakTime > 0 && intervalMs >= 1000) { 
-                                        peakTimesHistory.push(currentPeakTime);
-                                        
-                                        if (peakTimesHistory.length >= 3) {
-                                            if (peakTimesHistory.length > 4) {
-                                                peakTimesHistory.shift(); 
-                                            }
-                                            
-                                            let totalTimeMs = peakTimesHistory[peakTimesHistory.length - 1] - peakTimesHistory[0];
-                                            let numIntervals = peakTimesHistory.length - 1;
-                                            let avgIntervalMs = totalTimeMs / numIntervals;
-                                            let displayRR = Math.round(60000 / avgIntervalMs);
-
-                                            if (displayRR > 0 && displayRR <= 60) {
-                                                document.getElementById('rt-rr').innerText = displayRR;
-                                            }
-                                        }
-                                    } 
-                                    else if (lastPeakTime === 0) {
-                                        peakTimesHistory.push(currentPeakTime);
-                                    }
-                                    
-                                    if (lastPeakTime === 0 || intervalMs >= 1000) {
-                                        lastPeakTime = currentPeakTime; 
-                                    }
-                                }
-                            }
+                    if (isPeak && isAboveThreshold) {
+                        if (lastPeakTime === 0 || (cTime - lastPeakTime) >= minDistanceMs) {
+                            newPeaks.push(cTime);
+                            lastPeakTime = cTime; 
                         }
                     }
                 }
-            }
 
-            if(newestT - lastPeakTime > 15000 && lastPeakTime > 0) {
-                document.getElementById('rt-rr').innerText = "0";
-                peakTimesHistory = []; 
-                lastPeakTime = 0; 
+                // เอาจุดยอดใน 15 วินาทีล่าสุดมาหาค่าเฉลี่ย
+                if (newPeaks.length >= 2) {
+                    let totalTimeMs = newPeaks[newPeaks.length - 1] - newPeaks[0];
+                    let numIntervals = newPeaks.length - 1;
+                    let avgIntervalMs = totalTimeMs / numIntervals;
+                    let displayRR = Math.round(60000 / avgIntervalMs);
+
+                    if (displayRR > 0 && displayRR <= 60) {
+                        document.getElementById('rt-rr').innerText = displayRR;
+                    }
+                }
             }
 
             if (p.m !== lastMValue) {
@@ -916,7 +921,8 @@
             }
 
             liveChart.data.labels.shift();
-            liveChart.data.labels.push(""); 
+            let dt = new Date(p.t);
+            liveChart.data.labels.push(dt.getSeconds() + "s"); 
             liveChart.data.datasets[0].data.shift();
             liveChart.data.datasets[0].data.push(p.m);
             liveChart.update('none'); 
@@ -931,6 +937,7 @@
         document.getElementById('v-dot').className = (isOnline && (now - lastV < 45000)) ? 'dot on' : 'dot';
     }
 
+    // (ส่วน History ยังคงเดิม เพราะเราจูนไว้เป๊ะแล้วจากด้านบน)
     async function queryHistory() {
         const s = document.getElementById('st').value, e = document.getElementById('et').value;
         if(!s || !e) return alert("กรุณาระบุเวลาให้ครบถ้วน");
@@ -974,7 +981,6 @@
                     document.getElementById('pdf-btn').classList.remove('hidden');
                 }
 
-                // 🌟 1. เพิ่มความละเอียดจาก 1 วินาที เป็น 0.5 วินาทีต่อจุด 
                 let groupMs = 500; 
 
                 let aggregatedData = [];
@@ -1014,7 +1020,6 @@
                 const avgBpm = validBpms.length > 0 ? Math.round(validBpms.reduce((a, b) => a + b, 0) / validBpms.length) : "--";
                 const avgSpo2 = validSpo2s.length > 0 ? Math.round(validSpo2s.reduce((a, b) => a + b, 0) / validSpo2s.length) : "--";
                 
-                // 🌟 2. ลดการเกลี่ยคลื่นลง (ป้องกันคลื่นตื้นๆ โดนเกลี่ยจนหาย)
                 let windowSize = 3; 
                 let smoothedVals = [];
                 for(let i = 0; i < vals.length; i++) {
@@ -1042,16 +1047,14 @@
                 }
 
                 let breaths = 0;
-                // 🌟 3. ด่านแรก: กรอง Noise ที่เกิดตอนไม่หายใจ (เส้นตรง) ขยับไม่ถึง 25 หน่วย ไม่นับ!
                 let isFlatline = true;
                 let globalMax = Math.max(...smoothedVals);
                 let globalMin = Math.min(...smoothedVals);
                 if (globalMax - globalMin > 25) {
-                    isFlatline = false; // มีการหายใจจริงๆ
+                    isFlatline = false; 
                 }
 
                 if (!isFlatline) {
-                    // ระยะห่าง 2 จุด = 1 วินาที (ยอมให้หายใจติดกันได้เร็วสุด 60 ครั้ง/นาที)
                     let minDistance = 2; 
                     let historyLastPeakIdx = -minDistance;
 
@@ -1071,10 +1074,8 @@
                         }
                         let amplitude = localMax - localMin;
 
-                        // 🌟 4. ถ้าคลื่นจุดนั้นแคบมาก (ต่ำกว่า 25) ข้ามไปเลย ไม่ใช่คลื่นหายใจ
                         if (amplitude < 25) continue;
 
-                        // 🌟 5. ยอดคลื่นโผล่พ้นฐานแค่ 15% 
                         let dynamicThreshold = baseline + (amplitude * 0.15);
 
                         let isPeak = (curr > prev) && (curr >= next);
@@ -1113,7 +1114,6 @@
                 const innerContainer = document.getElementById('history-inner-container');
                 const scrollContainer = document.getElementById('history-scroll-container');
                 
-                // ขยายกราฟออกไปอีก เพราะข้อมูลถี่ขึ้น 2 เท่า กราฟจะได้ไม่ดูอัดแน่นเกินไป
                 let calculatedWidth = aggregatedData.length * 20; 
                 
                 if (calculatedWidth > scrollContainer.clientWidth - 40) {
