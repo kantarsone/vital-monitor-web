@@ -1040,7 +1040,8 @@
                 }
 
                 let breaths = 0;
-                let minDistance = 2; 
+                // 🌟 ปรับระยะห่างเป็น 1 วินาที (ยอมให้หายใจติดกันได้เร็วขึ้น)
+                let minDistance = 1; 
                 let historyLastPeakIdx = -minDistance;
 
                 for (let i = 1; i < smoothedVals.length - 1; i++) {
@@ -1059,12 +1060,14 @@
                     }
                     let amplitude = localMax - localMin;
 
-                    let dynamicThreshold = baseline + (amplitude * 0.2);
+                    // 🌟 ปรับ Threshold ให้จับง่ายขึ้น (ยอดคลื่นโผล่มาแค่ 10% ก็นับแล้ว)
+                    let dynamicThreshold = baseline + (amplitude * 0.1);
 
                     let isPeak = (curr > prev) && (curr >= next);
                     let isAboveThreshold = curr > dynamicThreshold;
 
-                    if (isPeak && isAboveThreshold && amplitude > 15) {
+                    // 🌟 ลดเกณฑ์ความกว้างคลื่นเหลือแค่ 10 กราฟขยับนิดเดียวก็นับให้เลย
+                    if (isPeak && isAboveThreshold && amplitude > 10) {
                         if ((i - historyLastPeakIdx) >= minDistance) {
                             breaths++;
                             historyLastPeakIdx = i; 
