@@ -246,6 +246,9 @@
             </div>
 
             <div id="prof-content" class="hidden">
+                <div id="admin-edit-controls" class="hidden no-print" style="margin-bottom: 15px; text-align: right;">
+                    <button class="tab-btn active" style="background:var(--orange); border-color:var(--orange);" onclick="enableProfileEdit()"><i class="fas fa-edit"></i> แก้ไขข้อมูล (Admin)</button>
+                </div>
                 <div class="profile-table">
                     <div class="p-row"><div class="p-label">ชื่อ-นามสกุล</div><div class="p-val" id="p-fullname">--</div></div>
                     <div class="p-row"><div class="p-label">วันเดือนปีเกิด</div><div class="p-val" id="p-dob">--</div></div>
@@ -651,6 +654,15 @@
         if(currentRole === 'doctor' || currentRole === 'admin') document.getElementById('back-to-home').classList.remove('hidden');
         else document.getElementById('back-to-home').classList.add('hidden');
         
+        // --- ส่วนที่ตรวจสอบให้เฉพาะแอดมินเห็นปุ่มแก้ไข ---
+        if(currentRole === 'admin') {
+            document.getElementById('admin-edit-controls').classList.remove('hidden');
+            if(typeof cancelProfileEdit === 'function') cancelProfileEdit(); // Reset สถานะปุ่มกลับเป็นค่าเริ่มต้น
+        } else {
+            document.getElementById('admin-edit-controls').classList.add('hidden');
+        }
+        // ------------------------------------------
+
         updateProfileUI(user.id, user.email, user);
         initCharts();
         switchTab('rt');
@@ -974,7 +986,6 @@
                     document.getElementById('pdf-btn').classList.remove('hidden');
                 }
 
-                // 🌟 1. เพิ่มความละเอียดจาก 1 วินาที เป็น 0.5 วินาทีต่อจุด 
                 let groupMs = 500; 
 
                 let aggregatedData = [];
@@ -1014,7 +1025,6 @@
                 const avgBpm = validBpms.length > 0 ? Math.round(validBpms.reduce((a, b) => a + b, 0) / validBpms.length) : "--";
                 const avgSpo2 = validSpo2s.length > 0 ? Math.round(validSpo2s.reduce((a, b) => a + b, 0) / validSpo2s.length) : "--";
                 
-                // 🌟 2. ลดการเกลี่ยคลื่นลง (ป้องกันคลื่นตื้นๆ โดนเกลี่ยจนหาย)
                 let windowSize = 3; 
                 let smoothedVals = [];
                 for(let i = 0; i < vals.length; i++) {
@@ -1042,16 +1052,14 @@
                 }
 
                 let breaths = 0;
-                // 🌟 3. ด่านแรก: กรอง Noise ที่เกิดตอนไม่หายใจ (เส้นตรง) ขยับไม่ถึง 25 หน่วย ไม่นับ!
                 let isFlatline = true;
                 let globalMax = Math.max(...smoothedVals);
                 let globalMin = Math.min(...smoothedVals);
                 if (globalMax - globalMin > 25) {
-                    isFlatline = false; // มีการหายใจจริงๆ
+                    isFlatline = false; 
                 }
 
                 if (!isFlatline) {
-                    // ระยะห่าง 2 จุด = 1 วินาที (ยอมให้หายใจติดกันได้เร็วสุด 60 ครั้ง/นาที)
                     let minDistance = 2; 
                     let historyLastPeakIdx = -minDistance;
 
@@ -1071,10 +1079,8 @@
                         }
                         let amplitude = localMax - localMin;
 
-                        // 🌟 4. ถ้าคลื่นจุดนั้นแคบมาก (ต่ำกว่า 25) ข้ามไปเลย ไม่ใช่คลื่นหายใจ
                         if (amplitude < 25) continue;
 
-                        // 🌟 5. ยอดคลื่นโผล่พ้นฐานแค่ 15% 
                         let dynamicThreshold = baseline + (amplitude * 0.15);
 
                         let isPeak = (curr > prev) && (curr >= next);
@@ -1113,7 +1119,6 @@
                 const innerContainer = document.getElementById('history-inner-container');
                 const scrollContainer = document.getElementById('history-scroll-container');
                 
-                // ขยายกราฟออกไปอีก เพราะข้อมูลถี่ขึ้น 2 เท่า กราฟจะได้ไม่ดูอัดแน่นเกินไป
                 let calculatedWidth = aggregatedData.length * 20; 
                 
                 if (calculatedWidth > scrollContainer.clientWidth - 40) {
@@ -1187,6 +1192,83 @@
             historyChart.resize();
             historyChart.update('none');
         }, 800);
+    }
+
+    // ==========================================
+    // --- ส่วนเสริม: ฟังก์ชันสำหรับ Admin แก้ไขประวัติส่วนตัว ---
+    // ==========================================
+    function enableProfileEdit() {
+        if (!viewingUser) return;
+        
+        // ปรับปุ่มให้กลายเป็นปุ่ม Save / Cancel
+        document.getElementById('admin-edit-controls').innerHTML = `
+            <button class="tab-btn active" style="background:var(--green); border-color:var(--green);" onclick="saveProfileEdit()"><i class="fas fa-save"></i> บันทึกข้อมูล</button>
+            <button class="tab-btn" style="background:var(--gray); border-color:var(--gray); color:white;" onclick="cancelProfileEdit()"><i class="fas fa-times"></i> ยกเลิก</button>
+        `;
+
+        // เปลี่ยนฟิลด์เป็น Input
+        document.getElementById('p-fullname').innerHTML = `
+            <input type="text" id="edit-fname" value="${viewingUser.first_name || ''}" placeholder="ชื่อ" style="width:48%; padding:8px; border:1px solid var(--border); border-radius:8px;">
+            <input type="text" id="edit-lname" value="${viewingUser.last_name || ''}" placeholder="นามสกุล" style="width:48%; padding:8px; border:1px solid var(--border); border-radius:8px;">
+        `;
+        document.getElementById('p-dob').innerHTML = `<input type="date" id="edit-dob" value="${viewingUser.dob || ''}" style="width:100%; max-width:300px; padding:8px; border:1px solid var(--border); border-radius:8px;">`;
+        document.getElementById('p-phone').innerHTML = `<input type="tel" id="edit-phone" value="${viewingUser.phone || ''}" style="width:100%; max-width:300px; padding:8px; border:1px solid var(--border); border-radius:8px;">`;
+        document.getElementById('p-address').innerHTML = `<textarea id="edit-address" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:8px;" rows="2">${viewingUser.address || ''}</textarea>`;
+
+        // HN ปรับได้เฉพาะตอนไม่ใช่หมอหรือแอดมิน
+        if (viewingUser.role !== 'doctor' && viewingUser.role !== 'admin') {
+             document.getElementById('p-id').innerHTML = `<input type="number" id="edit-hn" value="${viewingUser.hn || ''}" placeholder="ระบุ HN" style="width:100%; max-width:300px; padding:8px; border:1px solid var(--border); border-radius:8px;">`;
+        }
+    }
+
+    function cancelProfileEdit() {
+        // คืนค่าปุ่มแก้ไข
+        document.getElementById('admin-edit-controls').innerHTML = `
+            <button class="tab-btn active" style="background:var(--orange); border-color:var(--orange);" onclick="enableProfileEdit()"><i class="fas fa-edit"></i> แก้ไขข้อมูล (Admin)</button>
+        `;
+        // วาดค่าปกติกลับมาแสดงผล
+        updateProfileUI(viewingUser.id, viewingUser.email, viewingUser);
+    }
+
+    async function saveProfileEdit() {
+        const fname = document.getElementById('edit-fname').value.trim();
+        const lname = document.getElementById('edit-lname').value.trim();
+        const dob = document.getElementById('edit-dob').value;
+        const phone = document.getElementById('edit-phone').value.trim();
+        const address = document.getElementById('edit-address').value.trim();
+
+        let updateData = {
+            first_name: fname,
+            last_name: lname,
+            dob: dob,
+            phone: phone,
+            address: address
+        };
+
+        if (viewingUser.role !== 'doctor' && viewingUser.role !== 'admin') {
+            const hnInput = document.getElementById('edit-hn');
+            if(hnInput && hnInput.value) updateData.hn = parseInt(hnInput.value);
+            else if(hnInput) updateData.hn = null;
+        }
+
+        try {
+            const res = await fetch(`${S_URL}/rest/v1/profiles?id=eq.${viewingUser.id}`, {
+                method: 'PATCH',
+                headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            });
+
+            if(res.ok) {
+                alert("บันทึกข้อมูลส่วนตัวเรียบร้อย");
+                Object.assign(viewingUser, updateData); // อัปเดต Object ที่กำลังเปิดดูอยู่
+                cancelProfileEdit(); // เปลี่ยนหน้าตากลับไปเป็นแบบดูข้อมูลปกติ
+            } else {
+                alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+            }
+        } catch (error) {
+            console.error("Edit profile error:", error);
+            alert("ไม่สามารถติดต่อเซิร์ฟเวอร์เพื่อบันทึกข้อมูลได้");
+        }
     }
 </script>
 </body>
